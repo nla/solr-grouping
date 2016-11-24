@@ -1,0 +1,195 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.solr.search.grouping.distributed.command;
+
+import org.apache.lucene.queries.function.ValueSource;
+import org.apache.lucene.search.Collector;
+import org.apache.lucene.search.Sort;
+import org.apache.lucene.search.grouping.AbstractSecondPassGrouping2Collector;
+import org.apache.lucene.search.grouping.AbstractSecondPassGroupingCollector;
+import org.apache.lucene.search.grouping.AbstractThirdPassGrouping2Collector;
+import org.apache.lucene.search.grouping.CollectedSearchGroup2;
+import org.apache.lucene.search.grouping.GroupDocs;
+import org.apache.lucene.search.grouping.SearchGroup;
+import org.apache.lucene.search.grouping.TopGroups;
+import org.apache.lucene.search.grouping.function.FunctionSecondPassGroupingCollector;
+import org.apache.lucene.search.grouping.term.TermSecondPassGroupingCollector;
+import org.apache.lucene.search.grouping.term.TermThirdPassGrouping2Collector;
+import org.apache.lucene.util.BytesRef;
+import org.apache.lucene.util.mutable.MutableValue;
+import org.apache.solr.schema.FieldType;
+import org.apache.solr.schema.SchemaField;
+import org.apache.solr.search.grouping.Command;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+
+/**
+ * Defines all collectors for retrieving the second phase and how to handle the collector result.
+ */
+public class TopGroups2FieldCommand implements Command<TopGroups<BytesRef>> {
+
+  public static class Builder {
+
+    private SchemaField field;
+    private SchemaField parentField;
+    private Sort groupSort;
+    private Sort sortWithinGroup;
+    private Collection<CollectedSearchGroup2<BytesRef>> firstPhaseGroups;
+    private Integer maxDocPerGroup;
+    private boolean needScores = false;
+    private boolean needMaxScore = false;
+
+    public Builder setField(SchemaField field) {
+      this.field = field;
+      return this;
+    }
+
+    public Builder setParentField(SchemaField parentField) {
+      this.parentField = parentField;
+      return this;
+    }
+
+    public Builder setGroupSort(Sort groupSort) {
+      this.groupSort = groupSort;
+      return this;
+    }
+
+    public Builder setSortWithinGroup(Sort sortWithinGroup) {
+      this.sortWithinGroup = sortWithinGroup;
+      return this;
+    }
+
+    public Builder setFirstPhaseGroups(Collection<CollectedSearchGroup2<BytesRef>> firstPhaseGroups) {
+      this.firstPhaseGroups = firstPhaseGroups;
+      return this;
+    }
+
+    public Builder setMaxDocPerGroup(int maxDocPerGroup) {
+      this.maxDocPerGroup = maxDocPerGroup;
+      return this;
+    }
+
+    public Builder setNeedScores(Boolean needScores) {
+      this.needScores = needScores;
+      return this;
+    }
+
+    public Builder setNeedMaxScore(Boolean needMaxScore) {
+      this.needMaxScore = needMaxScore;
+      return this;
+    }
+
+    public TopGroups2FieldCommand build() {
+      if (field == null || groupSort == null ||  sortWithinGroup == null || firstPhaseGroups == null ||
+          maxDocPerGroup == null) {
+        throw new IllegalStateException("All required fields must be set");
+      }
+
+      return new TopGroups2FieldCommand(field, parentField, groupSort, sortWithinGroup, firstPhaseGroups, maxDocPerGroup, needScores, needMaxScore);
+    }
+
+  }
+
+  private final SchemaField field;
+  private final SchemaField parentField;
+  private final Sort groupSort;
+  private final Sort sortWithinGroup;
+  private final Collection<CollectedSearchGroup2<BytesRef>> firstPhaseGroups;
+  private final int maxDocPerGroup;
+  private final boolean needScores;
+  private final boolean needMaxScore;
+  private AbstractThirdPassGrouping2Collector thirdPassCollector;
+
+  private TopGroups2FieldCommand(SchemaField field, SchemaField parentField,
+                                Sort groupSort,
+                                Sort sortWithinGroup,
+                                Collection<CollectedSearchGroup2<BytesRef>> firstPhaseGroups,
+                                int maxDocPerGroup,
+                                boolean needScores,
+                                boolean needMaxScore) {
+    this.field = field;
+    this.parentField = parentField;
+    this.groupSort = groupSort;
+    this.sortWithinGroup = sortWithinGroup;
+    this.firstPhaseGroups = firstPhaseGroups;
+    this.maxDocPerGroup = maxDocPerGroup;
+    this.needScores = needScores;
+    this.needMaxScore = needMaxScore;
+  }
+
+  @Override
+  public List<Collector> create() throws IOException {
+    if (firstPhaseGroups.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    final List<Collector> collectors = new ArrayList<>(1);
+    final FieldType fieldType = field.getType();
+    if (fieldType.getNumericType() != null) {
+    	throw new IllegalStateException("Not collector not supported");
+//      ValueSource vs = fieldType.getValueSource(field, null);
+//      Collection<SearchGroup<MutableValue>> v = GroupConverter.toMutable(field, firstPhaseGroups);
+//      secondPassCollector = new FunctionSecondPassGroupingCollector(
+//          v, groupSort, sortWithinGroup, maxDocPerGroup, needScores, needMaxScore, true, vs, new HashMap<Object,Object>()
+//      );
+    } else {
+      thirdPassCollector = new TermThirdPassGrouping2Collector(
+      		field.getName(), parentField.getName(), firstPhaseGroups, groupSort, sortWithinGroup, maxDocPerGroup, needScores, needMaxScore, true
+      );
+    }
+    collectors.add(thirdPassCollector);
+    return collectors;
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public TopGroups<BytesRef> result() {
+    if (firstPhaseGroups.isEmpty()) {
+      return new TopGroups<>(groupSort.getSort(), sortWithinGroup.getSort(), 0, 0, new GroupDocs[0], Float.NaN);
+    }
+
+    FieldType fieldType = field.getType();
+    if (fieldType.getNumericType() != null) {
+      return GroupConverter.fromMutable(field, thirdPassCollector.getTopGroups(0));
+    } else {
+      return thirdPassCollector.getTopGroups(0);
+    }
+  }
+
+  @Override
+  public String getKey() {
+    return field.getName();
+  }
+  public String getParentKey() {
+    return parentField.getName();
+  }
+
+  @Override
+  public Sort getGroupSort() {
+    return groupSort;
+  }
+
+  @Override
+  public Sort getSortWithinGroup() {
+    return sortWithinGroup;
+  }
+}

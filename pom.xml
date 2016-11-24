@@ -1,0 +1,280 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>au.gov.nla.solr</groupId>
+  <artifactId>groupingsolr</artifactId>
+  <version>5.5.3.NLA.GROUPING.1-SNAPSHOT</version>
+
+  <packaging>jar</packaging>
+
+  <name>NLA Solr core</name>
+  <description>Custom modifications to the solr core classes.</description>
+  <url>http://lucene.apache.org/solr</url>
+
+  <properties>
+    <compileSource>1.8</compileSource>
+    <compileTarget>1.8</compileTarget>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <solr.version>5.5.3</solr.version>
+  </properties>
+
+  <build>
+    <finalName>nla-solr-grouping</finalName>
+    <plugins>
+      <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>2.3.2</version>
+        <configuration>
+          <source>${compileSource}</source>
+          <target>${compileTarget}</target>
+        </configuration>
+      </plugin>
+      <plugin>
+        <artifactId>maven-source-plugin</artifactId>
+        <version>2.2</version>
+        <executions>
+          <execution>
+            <id>attach-sources</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+    <extensions>
+      <extension>
+        <groupId>org.apache.maven.wagon</groupId>
+        <artifactId>wagon-ssh-external</artifactId>
+        <version>1.0-alpha-5</version>
+      </extension>
+    </extensions>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <artifactId>maven-site-plugin</artifactId>
+          <version>3.0</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+
+  <dependencies>
+    <!-- Test frameworks - Order does matter, these must come before core Solr components -->
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.10</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.solr</groupId>
+      <artifactId>solr-test-framework</artifactId>
+      <version>${solr.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- Solr/Lucene components -->
+    <dependency>
+      <groupId>org.apache.solr</groupId>
+      <artifactId>solr-core</artifactId>
+      <version>${solr.version}</version>
+      <scope>compile</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-jdk14</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.lucene</groupId>
+      <artifactId>lucene-core</artifactId>
+      <version>${solr.version}</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.lucene</groupId>
+      <artifactId>lucene-analyzers-common</artifactId>
+      <version>${solr.version}</version>
+    </dependency>
+    <!-- 3rd party. Useful unicode support -->
+    <dependency>
+      <groupId>com.ibm.icu</groupId>
+      <artifactId>icu4j</artifactId>
+      <version>3.8</version>
+    </dependency>
+    <dependency>
+	  <groupId>org.slf4j</groupId>
+	  <artifactId>slf4j-api</artifactId>
+	  <version>1.6.6</version>
+	</dependency>
+
+    <!-- Logging for unit tests -->
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-core</artifactId>
+      <version>1.0.7</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
+      <version>1.0.7</version>
+      <scope>test</scope>
+    </dependency>
+	<dependency>
+	  <groupId>org.slf4j</groupId>
+	  <artifactId>jcl-over-slf4j</artifactId>
+	  <version>1.6.6</version>
+	  <scope>test</scope>
+	</dependency>
+    <dependency>
+      <groupId>org.netpreserve.commons</groupId>
+      <artifactId>webarchive-commons</artifactId>
+      <version>1.1.4</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.htmlparser</groupId>
+          <artifactId>htmlparser</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.json</groupId>
+          <artifactId>json</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.googlecode.juniversalchardet</groupId>
+          <artifactId>juniversalchardet</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.pig</groupId>
+          <artifactId>pig</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.httpcomponents</groupId>
+          <artifactId>httpcore</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>joda-time</groupId>
+          <artifactId>joda-time</artifactId>
+        </exclusion>
+        </exclusions>
+    </dependency>
+
+    <!--
+    I want this to pick on chainedFilter from the contrib misc, but no artifact 13jul09
+
+        <dependency>
+          <groupId>org.apache.lucene</groupId>
+          <artifactId>lucene-contrib</artifactId>
+          <version>2.9-SNAPSHOT</version>
+        </dependency>
+    -->
+  </dependencies>
+
+  <repositories>
+    <repository>
+      <id>apache</id>
+      <name>Apache Snapshot Repository</name>
+      <url>http://people.apache.org/maven-snapshot-repository/</url>
+      <releases>
+        <updatePolicy>daily</updatePolicy>
+        <checksumPolicy>fail</checksumPolicy>
+      </releases>
+      <snapshots>
+        <updatePolicy>always</updatePolicy>
+        <!-- was always - delay drive me crazy kkf 20jul09 -->
+        <checksumPolicy>warn</checksumPolicy>
+      </snapshots>
+    </repository>
+  </repositories>
+
+  <organization>
+    <name>National Library of Australia</name>
+    <url>http://www.nla.gov.au</url>
+  </organization>
+
+  <inceptionYear>2007</inceptionYear>
+
+  <scm>
+    <url>http://svn.nla.gov.au/svn/apps/trunk/nlasolr/</url>
+    <connection>scm:svn:http://svn.nla.gov.au/svn/apps/trunk/nlasolr/</connection>
+    <developerConnection>scm:svn:http://svn.nla.gov.au/svn/apps/trunk/nlasolr/</developerConnection>
+  </scm>
+
+  <issueManagement>
+    <system>Jira</system>
+    <url>http://ourweb.nla.gov.au/apps/jira/browse/SBDP</url>
+  </issueManagement>
+
+  <distributionManagement>
+    <repository>
+      <id>nla</id>
+      <name>National Library of Australia Repository</name>
+      <url>http://dev.nla.gov.au/nexus/content/repositories/nla</url>
+    </repository>
+    <snapshotRepository>
+      <id>nla-snapshots</id>
+      <url>http://dev.nla.gov.au/nexus/content/repositories/nla-snapshots</url>
+    </snapshotRepository>
+  </distributionManagement>
+
+  <reporting>
+    <plugins>
+      <plugin>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <version>2.9</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jxr-plugin</artifactId>
+        <version>2.3</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>2.4.2</version>
+        <configuration>
+          <redirectTestOutputToFile>true</redirectTestOutputToFile>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>taglist-maven-plugin</artifactId>
+        <version>2.3</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-pmd-plugin</artifactId>
+        <version>2.7.1</version>
+        <configuration>
+          <targetJdk>${compileSource}</targetJdk>
+          <format>xml</format>
+          <linkXref>true</linkXref>
+          <sourceEncoding>utf-8</sourceEncoding>
+          <minimumTokens>100</minimumTokens>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>cobertura-maven-plugin</artifactId>
+        <version>2.5.2</version>
+        <configuration>
+          <formats>
+            <format>html</format>
+            <format>xml</format>
+          </formats>
+        </configuration>
+      </plugin>
+    </plugins>
+  </reporting>
+
+</project>
