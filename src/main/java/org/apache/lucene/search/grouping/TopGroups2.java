@@ -31,15 +31,19 @@ public class TopGroups2<GROUP_VALUE_TYPE> extends TopGroups<GROUP_VALUE_TYPE>{
 
   /** Group results in groupSort order */
   public final Group2Docs<GROUP_VALUE_TYPE>[] groups;
+  /** Number of documents matching the search */
+  public final long totalHitCount;
 
-  public TopGroups2(SortField[] groupSort, SortField[] withinGroupSort, int totalHitCount, int totalGroupedHitCount, Group2Docs<GROUP_VALUE_TYPE>[] groups, float maxScore) {
-  	super(groupSort, withinGroupSort, totalHitCount, totalGroupedHitCount, groups, maxScore);
+  public TopGroups2(SortField[] groupSort, SortField[] withinGroupSort, long totalHitCount, int totalGroupedHitCount, Group2Docs<GROUP_VALUE_TYPE>[] groups, float maxScore) {
+  	super(groupSort, withinGroupSort, 0, totalGroupedHitCount, groups, maxScore);
     this.groups = groups;
+    this.totalHitCount = totalHitCount;
   }
 
   public TopGroups2(TopGroups2<GROUP_VALUE_TYPE> oldTopGroups, Integer totalGroupCount) {
   	super(oldTopGroups, totalGroupCount);
     this.groups = oldTopGroups.groups;
+    this.totalHitCount = oldTopGroups.totalHitCount;
   }
 
   /** Merges an array of TopGroups, for example obtained

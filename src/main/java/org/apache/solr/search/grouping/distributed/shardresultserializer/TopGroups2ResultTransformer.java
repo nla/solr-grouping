@@ -124,7 +124,7 @@ public class TopGroups2ResultTransformer implements ShardResultTransformer<List<
         continue;
       }
 
-      Integer totalHitCount = (Integer) commandResult.get("totalHitCount");
+      Long totalHitCount = (Long) commandResult.get("totalHitCount");
 
       List<Group2Docs<BytesRef>> groupDocs = new ArrayList<>();
       for (int i = 2; i < commandResult.size(); i++) {// go through all level 1 groups
@@ -199,8 +199,9 @@ public class TopGroups2ResultTransformer implements ShardResultTransformer<List<
     return scoreDocs;
   }
 
-  protected NamedList serializeTopGroups(TopGroups<BytesRef> data, SchemaField groupField) throws IOException {
+  protected NamedList serializeTopGroups(TopGroups<BytesRef> d, SchemaField groupField) throws IOException {
     NamedList<Object> result = new NamedList<>();
+    TopGroups2<BytesRef> data = (TopGroups2<BytesRef>)d;
     result.add("totalGroupedHitCount", data.totalGroupedHitCount);
     result.add("totalHitCount", data.totalHitCount);
     if (data.totalGroupCount != null) {

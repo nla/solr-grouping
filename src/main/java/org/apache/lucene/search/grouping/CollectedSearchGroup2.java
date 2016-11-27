@@ -1,10 +1,6 @@
 package org.apache.lucene.search.grouping;
 
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-
-import org.apache.lucene.search.Sort;
 
 public class CollectedSearchGroup2<GROUP_VALUE_TYPE> extends CollectedSearchGroup<GROUP_VALUE_TYPE>{
 	public Collection<SearchGroup<GROUP_VALUE_TYPE>> subGroups;
@@ -25,9 +21,4 @@ public class CollectedSearchGroup2<GROUP_VALUE_TYPE> extends CollectedSearchGrou
 			}
 		}
 	}
-	
-//  public static <GROUP_VALUE_TYPE> Collection<SearchGroup<GROUP_VALUE_TYPE>> merge(List<Collection<SearchGroup<GROUP_VALUE_TYPE>>> topGroups, int offset, int topN, Sort groupSort){
-//  	if()
-//  }
-
 }

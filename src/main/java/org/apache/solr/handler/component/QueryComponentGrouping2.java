@@ -44,29 +44,27 @@ import org.apache.solr.search.SyntaxError;
 import org.apache.solr.search.grouping.CommandHandler;
 import org.apache.solr.search.grouping.Grouping2Specification;
 import org.apache.solr.search.grouping.GroupingSpecification;
-import org.apache.solr.search.grouping.distributed.command.TopGroupsFieldCommand;
-import org.apache.solr.search.grouping.distributed.command.QueryCommand.Builder;
 import org.apache.solr.search.grouping.distributed.ShardRequestFactory;
 import org.apache.solr.search.grouping.distributed.ShardResponseProcessor;
+import org.apache.solr.search.grouping.distributed.command.QueryCommand.Builder;
 import org.apache.solr.search.grouping.distributed.command.SearchGroups2FieldCommand;
 import org.apache.solr.search.grouping.distributed.command.SearchGroupsFieldCommand;
 import org.apache.solr.search.grouping.distributed.command.TopGroups2FieldCommand;
+import org.apache.solr.search.grouping.distributed.command.TopGroupsFieldCommand;
 import org.apache.solr.search.grouping.distributed.requestfactory.SearchGroupsRequestFactory;
 import org.apache.solr.search.grouping.distributed.requestfactory.StoredFieldsShardRequestFactory;
 import org.apache.solr.search.grouping.distributed.requestfactory.TopGroups2ShardRequestFactory;
 import org.apache.solr.search.grouping.distributed.requestfactory.TopGroupsShardRequestFactory;
+import org.apache.solr.search.grouping.distributed.responseprocessor.SearchGroup2SecondPhaseShardResponseProcessor;
 import org.apache.solr.search.grouping.distributed.responseprocessor.SearchGroup2ShardResponseProcessor;
-import org.apache.solr.search.grouping.distributed.responseprocessor.SearchGroupShardResponseProcessor;
 import org.apache.solr.search.grouping.distributed.responseprocessor.StoredFieldsShardResponseProcessor;
 import org.apache.solr.search.grouping.distributed.responseprocessor.TopGroups2ShardResponseProcessor;
-import org.apache.solr.search.grouping.distributed.responseprocessor.TopGroupsShardResponseProcessor;
 import org.apache.solr.search.grouping.distributed.shardresultserializer.SearchGroups2ResultTransformer;
 import org.apache.solr.search.grouping.distributed.shardresultserializer.SearchGroupsResultTransformer;
 import org.apache.solr.search.grouping.distributed.shardresultserializer.TopGroups2ResultTransformer;
 import org.apache.solr.search.grouping.distributed.shardresultserializer.TopGroupsResultTransformer;
 import org.apache.solr.search.grouping.endresulttransformer.EndResultTransformer;
 import org.apache.solr.search.grouping.endresulttransformer.Grouped2EndResultTransformer;
-import org.apache.solr.search.grouping.endresulttransformer.GroupedEndResultTransformer;
 import org.apache.solr.search.stats.StatsCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -253,8 +251,9 @@ public class QueryComponentGrouping2 extends QueryComponent{
           topsGroupsActionBuilder.addCommandField(groupCommand);
           CommandHandler commandHandler = topsGroupsActionBuilder.build();
           commandHandler.execute();
-          rsp.add("totalHitCount", commandHandler.getTotalHitCount());
-          
+          Long count = (long)commandHandler.getTotalHitCount();
+          rsp.add("totalHitCount", count);
+       
           SearchGroupsResultTransformer serializer = new SearchGroupsResultTransformer(searcher);
           rsp.add("firstPhase", commandHandler.processResult(result, serializer));
           rb.setResult(result);
@@ -539,13 +538,13 @@ if(1==1){throw new IllegalStateException("not yet supporting non distrib query."
     ShardResponseProcessor responseProcessor = null;
     System.out.println("XXXXXXXXXXXXXXXXXXXXXX  " + sreq.purpose);
     if ((sreq.purpose & ShardRequest.PURPOSE_GET_TOP_GROUPS) != 0) {
-      responseProcessor = new SearchGroupShardResponseProcessor();
+      responseProcessor = new SearchGroup2ShardResponseProcessor();
     } else if ((sreq.purpose & ShardRequest.PURPOSE_GET_TOP_IDS) != 0) {
     	if(sreq.responses.get(0).getSolrResponse().getResponse().get("thirdPhase")!=null){
     		responseProcessor = new TopGroups2ShardResponseProcessor();
     	}
     	else{
-    		responseProcessor = new SearchGroup2ShardResponseProcessor();
+    		responseProcessor = new SearchGroup2SecondPhaseShardResponseProcessor();
     	}
     } else if ((sreq.purpose & ShardRequest.PURPOSE_GET_FIELDS) != 0) {
       responseProcessor = new StoredFieldsShardResponseProcessor();

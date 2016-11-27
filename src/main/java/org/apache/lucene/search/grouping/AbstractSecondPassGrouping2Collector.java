@@ -251,7 +251,6 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE> ext
 
         return;
       }
-
       // We already tested that the document is competitive, so replace
       // the bottom group with this new group.
       final CollectedSearchGroup2<GROUP_VALUE_TYPE> bottomGroup = orderedGroups.pollLast();

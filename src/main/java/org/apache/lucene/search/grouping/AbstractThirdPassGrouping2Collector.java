@@ -51,7 +51,7 @@ public abstract class AbstractThirdPassGrouping2Collector<GROUP_VALUE_TYPE> exte
 
   protected SearchGroupDocs<GROUP_VALUE_TYPE>[][] groupDocs;
 
-  private int totalHitCount;
+  private long totalHitCount;
   private int totalGroupedHitCount;
 
   public AbstractThirdPassGrouping2Collector(Collection<CollectedSearchGroup2<GROUP_VALUE_TYPE>> groups, Sort groupSort, Sort withinGroupSort,
@@ -163,7 +163,7 @@ public abstract class AbstractThirdPassGrouping2Collector<GROUP_VALUE_TYPE> exte
     	}
     }
 
-    return new TopGroups<>(groupSort.getSort(),
+    return new TopGroups2<>(groupSort.getSort(),
                                            withinGroupSort.getSort(),
                                            totalHitCount, totalGroupedHitCount, groupDocsResult.toArray(new Group2Docs[0]),
                                            maxScore);
