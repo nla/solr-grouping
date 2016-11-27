@@ -72,7 +72,7 @@ public class TopGroups2<GROUP_VALUE_TYPE> extends TopGroups<GROUP_VALUE_TYPE>{
       return null;
     }
 
-    int totalHitCount = 0;
+    long totalHitCount = 0;
     int totalGroupedHitCount = 0;
     // Optionally merge the totalGroupCount.
     Integer totalGroupCount = null;
