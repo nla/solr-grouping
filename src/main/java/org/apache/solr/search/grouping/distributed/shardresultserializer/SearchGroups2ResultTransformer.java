@@ -66,13 +66,8 @@ public class SearchGroups2ResultTransformer implements ShardResultTransformer<Li
         final Collection<SearchGroup<BytesRef>> searchGroups = fieldCommandResult.getSearchGroups();
         AbstractSecondPassGrouping2Collector<BytesRef> collector = fieldCommand.getSecondPassGroupingCollector();
         if (searchGroups != null) {
-//          commandResult.add(TOP_GROUPS, serializeSearchGroup(collector, fieldCommand.getGroupSort()));
           result.add(TOP_GROUPS, serializeSearchGroup(collector, fieldCommand.getGroupSort()));
         }
-//        final Integer groupedCount = fieldCommandResult.getGroupCount();
-//        if (groupedCount != null) {
-//          commandResult.add(GROUP_COUNT, groupedCount);
-//        }
       } else {
         continue;
       }
@@ -94,7 +89,7 @@ public class SearchGroups2ResultTransformer implements ShardResultTransformer<Li
       	final String key = e.getKey();
       	CollectedSearchGroup2<BytesRef> collectedGroup = new CollectedSearchGroup2<>();
       	collectedGroup.groupValue = new BytesRef(key);
-      	final Integer count = (Integer)e.getValue().get(GROUP_COUNT);
+      	final Long count = (Long)e.getValue().get(GROUP_COUNT);
       	if(count != null){
       		collectedGroup.groupCount = count;
       	}

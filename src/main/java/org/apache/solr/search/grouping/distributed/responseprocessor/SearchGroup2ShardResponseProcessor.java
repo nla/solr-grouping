@@ -69,7 +69,6 @@ public class SearchGroup2ShardResponseProcessor implements ShardResponseProcesso
     SearchGroupsResultTransformer serializer = new SearchGroupsResultTransformer(rb.req.getSearcher());
     try {
       int maxElapsedTime = 0;
-      long hitCountDuringFirstPhase = 0;
 
       NamedList<Object> shardInfo = null;
       if (rb.req.getParams().getBool(ShardParams.SHARDS_INFO, false)) {
@@ -137,9 +136,7 @@ public class SearchGroup2ShardResponseProcessor implements ShardResponseProcesso
             shards.add(srsp.getShard());
           }
         }
-        hitCountDuringFirstPhase += (Long) srsp.getSolrResponse().getResponse().get("totalHitCount");
       }
-      rb.totalHitCount = (int)hitCountDuringFirstPhase;
       rb.firstPhaseElapsedTime = maxElapsedTime;
       for (String groupField : commandSearchGroups.keySet()) {
         List<Collection<SearchGroup<BytesRef>>> topGroups = commandSearchGroups.get(groupField);

@@ -112,7 +112,7 @@ public abstract class AbstractThirdPassGrouping2Collector<GROUP_VALUE_TYPE> exte
     totalHitCount++;
     SearchGroupDocs<GROUP_VALUE_TYPE> group = retrieveGroup(doc);
     if (group != null) {
-      totalGroupedHitCount++;
+//      totalGroupedHitCount++;
       group.leafCollector.setScorer(scorer);
       group.leafCollector.collect(doc);
     }
@@ -165,7 +165,7 @@ public abstract class AbstractThirdPassGrouping2Collector<GROUP_VALUE_TYPE> exte
 
     return new TopGroups2<>(groupSort.getSort(),
                                            withinGroupSort.getSort(),
-                                           totalHitCount, totalGroupedHitCount, groupDocsResult.toArray(new Group2Docs[0]),
+                                           totalHitCount, -1 /*totalGroupedHitCount*/, groupDocsResult.toArray(new Group2Docs[0]),
                                            maxScore);
   }
 

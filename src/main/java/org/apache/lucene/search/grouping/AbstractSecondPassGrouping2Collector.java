@@ -52,7 +52,7 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE> ext
   private int docBase;
   private int spareSlot;
 
-  private int totalHitCount = 0;
+  private long totalHitCount = 0;
 
   /**
    * Create the first pass collector.
@@ -142,7 +142,6 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE> ext
       //System.out.println("  group=" + (group.groupValue == null ? "null" : group.groupValue.utf8ToString()));
       CollectedSearchGroup2<GROUP_VALUE_TYPE> searchGroup = new CollectedSearchGroup2<>();
       searchGroup.groupValue = group.groupValue;
-//      searchGroup.subGroupMap = new HashMap<>();
       if (fillFields) {
         searchGroup.sortValues = new Object[sortFieldCount];
         for(int sortFieldIDX=0;sortFieldIDX<sortFieldCount;sortFieldIDX++) {
@@ -383,7 +382,7 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE> ext
 		return collectors.get(ref);
 	}
   
-  public int getTotalHitCount(){
+  public long getTotalHitCount(){
 		return totalHitCount;
 	}
   /**

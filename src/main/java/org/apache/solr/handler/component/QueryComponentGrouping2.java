@@ -237,7 +237,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
           CommandHandler.Builder topsGroupsActionBuilder = new CommandHandler.Builder()
               .setQueryCommand(cmd)
               .setNeedDocSet(false) // Order matters here
-              .setIncludeHitCount(true)
+              .setIncludeHitCount(false)
               .setSearcher(searcher);
 
           // use the first field for first level grouping
@@ -251,8 +251,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
           topsGroupsActionBuilder.addCommandField(groupCommand);
           CommandHandler commandHandler = topsGroupsActionBuilder.build();
           commandHandler.execute();
-          Long count = (long)commandHandler.getTotalHitCount();
-          rsp.add("totalHitCount", count);
+          rsp.add("totalHitCount", -1);
        
           SearchGroupsResultTransformer serializer = new SearchGroupsResultTransformer(searcher);
           rsp.add("firstPhase", commandHandler.processResult(result, serializer));
@@ -283,13 +282,6 @@ public class QueryComponentGrouping2 extends QueryComponent{
               }
             }
 
-
-//          topsGroupsActionBuilder = new CommandHandler.Builder()
-//              .setQueryCommand(cmd)
-//              .setNeedDocSet(false) // Order matters here
-//              .setIncludeHitCount(false)
-//              .setSearcher(searcher);
-          
           String field2 = groupingSpec.getParentFields().get(field);
           topsGroupsActionBuilder.addCommandField(new SearchGroups2FieldCommand.Builder()
               .setField(schema.getField(field2))
