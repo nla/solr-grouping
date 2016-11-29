@@ -60,8 +60,8 @@ public class TopGroups2ShardResponseProcessor implements ShardResponseProcessor 
   @SuppressWarnings("unchecked")
   public void process(ResponseBuilder rb, ShardRequest shardRequest) {
     Sort groupSort = rb.getGroupingSpec().getGroupSort();
-    String[] fields = rb.getGroupingSpec().getFields();
-    String subField = ((Grouping2Specification)rb.getGroupingSpec()).getParentFields().get(fields[0]);
+    String field = ((Grouping2Specification)rb.getGroupingSpec()).getField();
+    String subField = ((Grouping2Specification)rb.getGroupingSpec()).getSubField();
     String[] queries = rb.getGroupingSpec().getQueries();
     Sort sortWithinGroup = rb.getGroupingSpec().getSortWithinGroup();
     if (sortWithinGroup == null) { // TODO prevent it from being null in the first place
@@ -78,9 +78,7 @@ public class TopGroups2ShardResponseProcessor implements ShardResponseProcessor 
     int docsPerGroupDefault = rb.getGroupingSpec().getGroupLimit();
 
     Map<String, List<TopGroups<BytesRef>>> commandTopGroups = new HashMap<>();
-    for (String field : fields) {
-      commandTopGroups.put(field+"."+subField, new ArrayList<TopGroups<BytesRef>>());
-    }
+    commandTopGroups.put(field+"."+subField, new ArrayList<TopGroups<BytesRef>>());
 
     Map<String, List<QueryCommandResult>> commandTopDocs = new HashMap<>();
     for (String query : queries) {
@@ -132,8 +130,8 @@ public class TopGroups2ShardResponseProcessor implements ShardResponseProcessor 
       Map<String, ?> result = serializer.transformToNative(thirdPhaseResult, groupSort, sortWithinGroup, srsp.getShard());
       int numFound = 0;
       float maxScore = Float.NaN;
-      for (String field : commandTopGroups.keySet()) {
-        TopGroups2<BytesRef> topGroups = (TopGroups2<BytesRef>) result.get(field);
+      for (String f : commandTopGroups.keySet()) {
+        TopGroups2<BytesRef> topGroups = (TopGroups2<BytesRef>) result.get(f);
         if (topGroups == null) {
           continue;
         }
@@ -141,7 +139,7 @@ public class TopGroups2ShardResponseProcessor implements ShardResponseProcessor 
           numFound += topGroups.totalHitCount;
           if (Float.isNaN(maxScore) || topGroups.maxScore > maxScore) maxScore = topGroups.maxScore;
         }
-        commandTopGroups.get(field).add(topGroups);
+        commandTopGroups.get(f).add(topGroups);
       }
       for (String query : queries) {
         QueryCommandResult queryCommandResult = (QueryCommandResult) result.get(query);

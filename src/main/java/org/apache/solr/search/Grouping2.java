@@ -48,18 +48,21 @@ import org.apache.lucene.search.TopFieldCollector;
 import org.apache.lucene.search.TopScoreDocCollector;
 import org.apache.lucene.search.TotalHitCountCollector;
 import org.apache.lucene.search.grouping.AbstractAllGroupHeadsCollector;
+import org.apache.lucene.search.grouping.CollectedSearchGroup;
 import org.apache.lucene.search.grouping.CollectedSearchGroup2;
+import org.apache.lucene.search.grouping.Group2Docs;
 import org.apache.lucene.search.grouping.GroupDocs;
 import org.apache.lucene.search.grouping.SearchGroup;
 import org.apache.lucene.search.grouping.TopGroups;
+import org.apache.lucene.search.grouping.TopGroups2;
 import org.apache.lucene.search.grouping.function.FunctionAllGroupHeadsCollector;
 import org.apache.lucene.search.grouping.function.FunctionAllGroupsCollector;
 import org.apache.lucene.search.grouping.function.FunctionFirstPassGroupingCollector;
 import org.apache.lucene.search.grouping.function.FunctionSecondPassGroupingCollector;
 import org.apache.lucene.search.grouping.term.TermAllGroupHeadsCollector;
 import org.apache.lucene.search.grouping.term.TermAllGroupsCollector;
-import org.apache.lucene.search.grouping.term.TermFirstPassGrouping2Collector;
 import org.apache.lucene.search.grouping.term.TermFirstPassGroupingCollector;
+import org.apache.lucene.search.grouping.term.TermSecondPassGrouping2Collector;
 import org.apache.lucene.search.grouping.term.TermSecondPassGroupingCollector;
 import org.apache.lucene.search.grouping.term.TermThirdPassGrouping2Collector;
 import org.apache.lucene.util.BytesRef;
@@ -151,7 +154,7 @@ public class Grouping2 {
    *
    * @param field The fieldname to group by.
    */
-  public void addFieldCommand(String field, SolrQueryRequest request) throws SyntaxError {
+  public void addFieldCommand(String field, String subField, SolrQueryRequest request) throws SyntaxError {
     SchemaField schemaField = searcher.getSchema().getField(field); // Throws an exception when field doesn't exist. Bad request.
     FieldType fieldType = schemaField.getType();
     ValueSource valueSource = fieldType.getValueSource(schemaField, null);
@@ -159,10 +162,19 @@ public class Grouping2 {
       addFunctionCommand(field, request);
       return;
     }
+    schemaField = searcher.getSchema().getField(subField); // Throws an exception when field doesn't exist. Bad request.
+    fieldType = schemaField.getType();
+    valueSource = fieldType.getValueSource(schemaField, null);
+    if (!(valueSource instanceof StrFieldSource)) {
+      addFunctionCommand(field, request);
+      throw new IllegalArgumentException("only string sub fields supported at the moment.");
+//      return;
+    }
 
     Grouping2.CommandField gc = new CommandField();
     gc.withinGroupSort = withinGroupSort;
-    gc.groupBy = field;
+    gc.groupBy = subField;
+    gc.parentGroupBy = field;
     gc.key = field;
     gc.numGroups = limitDefault;
     gc.docsPerGroup = docsPerGroupDefault;
@@ -407,6 +419,39 @@ public class Grouping2 {
       }
     }
 
+ // third pass
+    collectors.clear();
+    for (Command cmd : commands) {
+      Collector collector = cmd.createThirdPassCollector();
+      if (collector != null)
+        collectors.add(collector);
+    }
+
+    if (!collectors.isEmpty()) {
+      Collector thirdPhaseCollectors = MultiCollector.wrap(collectors.toArray(new Collector[collectors.size()]));
+      if (collectors.size() > 0) {
+        if (cachedCollector != null) {
+          if (cachedCollector.isCached()) {
+            cachedCollector.replay(thirdPhaseCollectors);
+          } else {
+            signalCacheWarning = true;
+            logger.warn(String.format(Locale.ROOT, "The grouping cache is active, but not used because it exceeded the max cache limit of %d percent", maxDocsPercentageToCache));
+            logger.warn("Please increase cache size or disable group caching.");
+            searchWithTimeLimiter(luceneFilter, thirdPhaseCollectors);
+          }
+        } else {
+          if (pf.postFilter != null) {
+            pf.postFilter.setLastDelegate(thirdPhaseCollectors);
+            thirdPhaseCollectors = pf.postFilter;
+          }
+          searchWithTimeLimiter(luceneFilter, thirdPhaseCollectors);
+        }
+        if (thirdPhaseCollectors instanceof DelegatingCollector) {
+          ((DelegatingCollector) thirdPhaseCollectors).finish();
+        }
+      }
+    }
+
     for (Command cmd : commands) {
       cmd.finish();
     }
@@ -528,7 +573,7 @@ public class Grouping2 {
     public boolean main;     // use as the main result in simple format (grouped.main=true param)
     public TotalCount totalCount = TotalCount.ungrouped;
 
-    TopGroups<GROUP_VALUE_TYPE> result;
+    TopGroups2<GROUP_VALUE_TYPE> result;
 
 
     /**
@@ -556,6 +601,9 @@ public class Grouping2 {
      * @throws IOException If I/O related errors occur
      */
     protected Collector createSecondPassCollector() throws IOException {
+      return null;
+    }
+    protected Collector createThirdPassCollector() throws IOException {
       return null;
     }
 
@@ -702,14 +750,15 @@ public class Grouping2 {
 
     public String groupBy;
     public String parentGroupBy;
-    TermFirstPassGrouping2Collector firstPass;
-    TermThirdPassGrouping2Collector secondPass;
+    TermFirstPassGroupingCollector firstPass;
+    TermSecondPassGrouping2Collector secondPass;
+    TermThirdPassGrouping2Collector thirdPass;
 
     TermAllGroupsCollector allGroupsCollector;
 
     // If offset falls outside the number of documents a group can provide use this collector instead of secondPass
     TotalHitCountCollector fallBackCollector;
-    Collection<CollectedSearchGroup2<BytesRef>> topGroups;
+    Collection<SearchGroup<BytesRef>> topGroups;
 
     /**
      * {@inheritDoc}
@@ -731,7 +780,7 @@ public class Grouping2 {
       }
 
       groupSort = groupSort == null ? Sort.RELEVANCE : groupSort;
-      firstPass = new TermFirstPassGrouping2Collector(groupBy, parentGroupBy, groupSort, actualGroupsToFind);
+      firstPass = new TermFirstPassGroupingCollector(parentGroupBy, groupSort, actualGroupsToFind);
       return firstPass;
     }
 
@@ -758,10 +807,9 @@ public class Grouping2 {
 
       int groupedDocsToCollect = getMax(groupOffset, docsPerGroup, maxDoc);
       groupedDocsToCollect = Math.max(groupedDocsToCollect, 1);
-      Sort withinGroupSort = this.withinGroupSort != null ? this.withinGroupSort : Sort.RELEVANCE;
-//      secondPass = new TermThirdPassGrouping2Collector(
-//          groupBy, topGroups, groupSort, withinGroupSort, groupedDocsToCollect, needScores, needScores, false
-//      );
+      secondPass = new TermSecondPassGrouping2Collector(
+      		groupBy, parentGroupBy, null, topGroups, groupSort,10
+      );
 
       if (totalCount == TotalCount.grouped) {
         allGroupsCollector = new TermAllGroupsCollector(groupBy);
@@ -769,6 +817,19 @@ public class Grouping2 {
       } else {
         return secondPass;
       }
+    }
+    
+    @Override
+    protected Collector createThirdPassCollector() throws IOException{
+    	if(secondPass == null){
+    		return null;
+    	}
+      Sort withinGroupSort = this.withinGroupSort != null ? this.withinGroupSort : Sort.RELEVANCE;
+      int groupedDocsToCollect = getMax(groupOffset, docsPerGroup, maxDoc);
+      groupedDocsToCollect = Math.max(groupedDocsToCollect, 1);
+    	Collection<CollectedSearchGroup2<BytesRef>> topGroups = secondPass.getTopGroupsNested(groupOffset, false);
+    	thirdPass = new TermThirdPassGrouping2Collector(groupBy, parentGroupBy, topGroups, groupSort, withinGroupSort, groupedDocsToCollect, needScores, needScores, false);
+    	return thirdPass;
     }
 
     /**
@@ -785,7 +846,7 @@ public class Grouping2 {
      */
     @Override
     protected void finish() throws IOException {
-      result = secondPass != null ? secondPass.getTopGroups(0) : null;
+      result = thirdPass != null ? (TopGroups2<BytesRef>)thirdPass.getTopGroups(0) : null;
       if (main) {
         mainResult = createSimpleResponse();
         return;
@@ -798,8 +859,9 @@ public class Grouping2 {
         return;
       }
 
+      List<NamedList> parentGroupList = new ArrayList<>();
+      groupResult.add("groups", parentGroupList);        // grouped={ parentkey={ groups=[
       List groupList = new ArrayList();
-      groupResult.add("groups", groupList);        // grouped={ key={ groups=[
 
       if (result == null) {
         return;
@@ -808,7 +870,32 @@ public class Grouping2 {
       // handle case of rows=0
       if (numGroups == 0) return;
 
-      for (GroupDocs<BytesRef> group : result.groups) {
+      SchemaField schemaField = searcher.getSchema().getField(groupBy);
+      FieldType fieldType = schemaField.getType();
+      SchemaField schemaParentField = searcher.getSchema().getField(parentGroupBy);
+      FieldType parentFieldType = schemaParentField.getType();
+      String parentGroupValue = "";
+      for (Group2Docs<BytesRef> group : result.groups) {
+      	String readableValue = parentFieldType.indexedToReadable(group.groupParentValue.utf8ToString());
+      	IndexableField field = schemaParentField.createField(readableValue, 1.0f);
+      	if(!parentGroupValue.equals(readableValue)){
+      		System.out.println(readableValue);
+      		NamedList<Object> parentRec = new SimpleOrderedMap<>();
+      		parentGroupList.add(parentRec);
+      		parentRec.add("groupValue", fieldType.toObject(field));
+      		parentGroupValue = readableValue;
+      		NamedList<Object> subGrouped = new SimpleOrderedMap<>();
+      		NamedList<Object> subKey = new SimpleOrderedMap<>();
+      		NamedList<Object> subRec = new SimpleOrderedMap<>();
+          groupList = new ArrayList();
+          parentRec.add("subGrouped", subGrouped);
+          subGrouped.add(groupBy, subKey);
+          // have to get the count from the second pass collector
+          long count = secondPass.getCollectors(group.groupParentValue).getTotalHitCount();
+          subKey.add("matches", count);
+          subKey.add("groups", groupList);        // grouped={ key={ groups=[
+
+      	}
         NamedList nl = new SimpleOrderedMap();
         groupList.add(nl);                         // grouped={ key={ groups=[ {
 
@@ -817,10 +904,8 @@ public class Grouping2 {
         // In trunk MutableValue can convert an indexed value to its native type. E.g. string to int
         // The only option I currently see is the use the FieldType for this
         if (group.groupValue != null) {
-          SchemaField schemaField = searcher.getSchema().getField(groupBy);
-          FieldType fieldType = schemaField.getType();
-          String readableValue = fieldType.indexedToReadable(group.groupValue.utf8ToString());
-          IndexableField field = schemaField.createField(readableValue, 1.0f);
+          readableValue = fieldType.indexedToReadable(group.groupValue.utf8ToString());
+          field = schemaField.createField(readableValue, 1.0f);
           nl.add("groupValue", fieldType.toObject(field));
         } else {
           nl.add("groupValue", null);
@@ -839,7 +924,7 @@ public class Grouping2 {
         return 0;
       }
 
-      return result != null ? result.totalHitCount : fallBackCollector.getTotalHits();
+      return result != null ? (int)result.totalHitCount : fallBackCollector.getTotalHits();
     }
 
     /**
@@ -1003,7 +1088,8 @@ public class Grouping2 {
      */
     @Override
     protected void finish() throws IOException {
-      result = secondPass != null ? secondPass.getTopGroups(0) : null;
+//      result = secondPass != null ? secondPass.getTopGroups(0) : null;
+      result = secondPass != null ? null : null;
       if (main) {
         mainResult = createSimpleResponse();
         return;
@@ -1043,7 +1129,7 @@ public class Grouping2 {
         return 0;
       }
 
-      return result != null ? result.totalHitCount : fallBackCollector.getTotalHits();
+      return result != null ? (int)result.totalHitCount : fallBackCollector.getTotalHits();
     }
 
     /**

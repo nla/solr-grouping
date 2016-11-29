@@ -37,6 +37,7 @@ import org.apache.solr.schema.SchemaField;
 import org.apache.solr.search.DocListAndSet;
 import org.apache.solr.search.DocSlice;
 import org.apache.solr.search.Grouping;
+import org.apache.solr.search.Grouping2;
 import org.apache.solr.search.SolrIndexSearcher;
 import org.apache.solr.search.SortSpec;
 import org.apache.solr.search.SortSpecParsing;
@@ -130,15 +131,14 @@ public class QueryComponentGrouping2 extends QueryComponent{
     groupingSpec.setTruncateGroups(params.getBool(GroupParams.GROUP_TRUNCATE, false));
     
     // check for second level grouping
-    for(String f : groupingSpec.getFields()){
-    	String[] names = params.getParams(GroupParams.GROUP_FIELD + "."+f);
-    	if(names != null && names.length > 0){
-    		if(names.length > 1){
-    			throw new IllegalStateException("Second level group can only be single.");
-    		}
-    		groupingSpec.setParentFields(f, names[0]);
-    	}
-    }
+    String f = groupingSpec.getField();
+    String[] names = params.getParams(GroupParams.GROUP_FIELD + "."+f);
+  	if(names != null && names.length > 0){
+  		if(names.length > 1){
+  			throw new IllegalStateException("Second level group can only be single.");
+  		}
+  		groupingSpec.setSubField(names[0]);
+  	}
   }
 	
 	@Override
@@ -241,7 +241,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
               .setSearcher(searcher);
 
           // use the first field for first level grouping
-          String field = groupingSpec.getFields()[0];
+          String field = groupingSpec.getField();
           SearchGroupsFieldCommand groupCommand = new SearchGroupsFieldCommand.Builder()
               .setField(schema.getField(field))
               .setGroupSort(groupingSpec.getGroupSort())
@@ -282,7 +282,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
               }
             }
 
-          String field2 = groupingSpec.getParentFields().get(field);
+          String field2 = groupingSpec.getSubField();
           topsGroupsActionBuilder.addCommandField(new SearchGroups2FieldCommand.Builder()
               .setField(schema.getField(field2))
               .setParentField(schema.getField(field))
@@ -308,7 +308,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
               .setNeedDocSet(false) // Order matters here
               .setIncludeHitCount(false)
               .setSearcher(searcher);
-          SchemaField schemaSubField = schema.getField(groupingSpec.getParentFields().get(groupingSpec.getFields()[0]));
+          SchemaField schemaSubField = schema.getField(groupingSpec.getSubField());
           
           for (String field : groupingSpec.getFields()) {
             SchemaField schemaField = schema.getField(field);
@@ -338,7 +338,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
               }
             }
 
-          String field2 = groupingSpec.getParentFields().get(field);
+          String field2 = groupingSpec.getSubField();
           topsGroupsActionBuilder.addCommandField(
           		 new TopGroups2FieldCommand.Builder()
                .setField(schema.getField(field2))
@@ -367,7 +367,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
 
           for (String field : groupingSpec.getFields()) {
             SchemaField schemaField = schema.getField(field);
-            String innerField = groupingSpec.getParentFields().get(field);
+            String innerField = groupingSpec.getSubField();
             SchemaField innerSchemaField = schema.getField(innerField);
             String[] topGroupsParam = params.getParams(GroupParams.GROUP_DISTRIBUTED_TOPGROUPS_PREFIX + field);
             if (topGroupsParam == null) {
@@ -421,27 +421,28 @@ public class QueryComponentGrouping2 extends QueryComponent{
           rb.setResult(result);
           return;
         }
-if(1==1){throw new IllegalStateException("not yet supporting non distrib query.");}
         int maxDocsPercentageToCache = params.getInt(GroupParams.GROUP_CACHE_PERCENTAGE, 0);
         boolean cacheSecondPassSearch = maxDocsPercentageToCache >= 1 && maxDocsPercentageToCache <= 100;
-        Grouping.TotalCount defaultTotalCount = groupingSpec.isIncludeGroupCount() ?
-            Grouping.TotalCount.grouped : Grouping.TotalCount.ungrouped;
+        Grouping2.TotalCount defaultTotalCount = groupingSpec.isIncludeGroupCount() ?
+            Grouping2.TotalCount.grouped : Grouping2.TotalCount.ungrouped;
         int limitDefault = cmd.getLen(); // this is normally from "rows"
-        Grouping grouping =
-            new Grouping(searcher, result, cmd, cacheSecondPassSearch, maxDocsPercentageToCache, groupingSpec.isMain());
+        Grouping2 grouping =
+            new Grouping2(searcher, result, cmd, cacheSecondPassSearch, maxDocsPercentageToCache, groupingSpec.isMain());
+        Grouping2.Format format = Grouping2.Format.grouped;
+        if(Grouping.Format.simple == groupingSpec.getResponseFormat()){
+        	format = Grouping2.Format.simple;
+        }
         grouping.setGroupSort(groupingSpec.getGroupSort())
             .setWithinGroupSort(groupingSpec.getSortWithinGroup())
-            .setDefaultFormat(groupingSpec.getResponseFormat())
+            .setDefaultFormat(format)
             .setLimitDefault(limitDefault)
             .setDefaultTotalCount(defaultTotalCount)
             .setDocsPerGroupDefault(groupingSpec.getGroupLimit())
             .setGroupOffsetDefault(groupingSpec.getGroupOffset())
             .setGetGroupedDocSet(groupingSpec.isTruncateGroups());
 
-        if (groupingSpec.getFields() != null) {
-          for (String field : groupingSpec.getFields()) {
-            grouping.addFieldCommand(field, rb.req);
-          }
+        if (groupingSpec.getField() != null) {
+        	grouping.addFieldCommand(groupingSpec.getField(), groupingSpec.getSubField(), rb.req);
         }
 
         if (groupingSpec.getFunctions() != null) {
@@ -550,11 +551,10 @@ if(1==1){throw new IllegalStateException("not yet supporting non distrib query."
   @SuppressWarnings("unchecked")
   protected void groupedFinishStage(final ResponseBuilder rb) {
     // To have same response as non-distributed request.
-    GroupingSpecification groupSpec = rb.getGroupingSpec();
+    Grouping2Specification groupSpec = (Grouping2Specification)rb.getGroupingSpec();
     if (rb.mergedTopGroups.isEmpty()) {
-      for (String field : groupSpec.getFields()) {
-        rb.mergedTopGroups.put(field, new TopGroups(null, null, 0, 0, new GroupDocs[]{}, Float.NaN));
-      }
+      String field = groupSpec.getField();
+      rb.mergedTopGroups.put(field, new TopGroups(null, null, 0, 0, new GroupDocs[]{}, Float.NaN));
       rb.resultIds = new HashMap<>();
     }
 

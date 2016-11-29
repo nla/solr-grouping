@@ -130,8 +130,8 @@ if(1==1) // for second level we need to check all shards
 	          phaseSet = true;
 	          phaseThree = true;
 	          Grouping2Specification spec = (Grouping2Specification)rb.getGroupingSpec();
-	          field = spec.getFields()[0];
-	          subField = spec.getParentFields().get(field);
+	          field = spec.getField();
+	          subField = spec.getSubField();
 	      	}
 	      	else{
 	          sreq.params.set(GroupParams.GROUP_DISTRIBUTED_SECOND, "true");

@@ -58,9 +58,9 @@ public class Grouped2EndResultTransformer implements EndResultTransformer {
   public void transform(Map<String, ?> result, ResponseBuilder rb, SolrDocumentSource solrDocumentSource) {
     NamedList<Object> grouped = new SimpleOrderedMap<>();
     NamedList<Object> groupContainer = new SimpleOrderedMap<>();
-    String field = rb.getGroupingSpec().getFields()[0];
+    String field = ((Grouping2Specification)rb.getGroupingSpec()).getField();
     SchemaField schemaField = searcher.getSchema().getField(field);
-    String subField = ((Grouping2Specification)rb.getGroupingSpec()).getParentFields().get(field);
+    String subField = ((Grouping2Specification)rb.getGroupingSpec()).getSubField();
     SchemaField schemaSubField = searcher.getSchema().getField(subField);
     TopGroups2<BytesRef> topGroups = (TopGroups2<BytesRef>)rb.mergedTopGroups.get(field+"."+subField);
     

@@ -1,5 +1,12 @@
 package org.apache.solr.search.grouping.distributed.command;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -21,24 +28,15 @@ import org.apache.lucene.queries.function.ValueSource;
 import org.apache.lucene.search.Collector;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.grouping.AbstractAllGroupsCollector;
-import org.apache.lucene.search.grouping.AbstractFirstPassGrouping2Collector;
-import org.apache.lucene.search.grouping.AbstractFirstPassGroupingCollector;
 import org.apache.lucene.search.grouping.AbstractSecondPassGrouping2Collector;
-import org.apache.lucene.search.grouping.CollectedSearchGroup2;
 import org.apache.lucene.search.grouping.SearchGroup;
 import org.apache.lucene.search.grouping.function.FunctionAllGroupsCollector;
-import org.apache.lucene.search.grouping.function.FunctionFirstPassGroupingCollector;
 import org.apache.lucene.search.grouping.term.TermAllGroupsCollector;
-import org.apache.lucene.search.grouping.term.TermFirstPassGrouping2Collector;
-import org.apache.lucene.search.grouping.term.TermFirstPassGroupingCollector;
 import org.apache.lucene.search.grouping.term.TermSecondPassGrouping2Collector;
 import org.apache.lucene.util.BytesRef;
 import org.apache.solr.schema.FieldType;
 import org.apache.solr.schema.SchemaField;
 import org.apache.solr.search.grouping.Command;
-
-import java.io.IOException;
-import java.util.*;
 
 /**
  * Creates all the collectors needed for the first phase and how to handle the results.
