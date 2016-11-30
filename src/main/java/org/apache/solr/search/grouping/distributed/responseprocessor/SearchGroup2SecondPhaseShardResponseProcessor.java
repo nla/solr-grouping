@@ -163,7 +163,7 @@ public class SearchGroup2SecondPhaseShardResponseProcessor implements ShardRespo
       for(Map.Entry<String, List<Collection<SearchGroup<BytesRef>>>> e : all.entrySet()){ 
       	BytesRef groupKey = new BytesRef(e.getKey());
       	Collection<SearchGroup<BytesRef>> mergedTopGroups = SearchGroup.merge(e.getValue(), ss.getOffset(), ss.getCount(), groupSort);
-      	Iterator<SearchGroup<BytesRef>> i = rb.mergedSearchGroups.get("site").iterator();
+      	Iterator<SearchGroup<BytesRef>> i = rb.mergedSearchGroups.get(field).iterator();
       	while(i.hasNext()){// todo change to use passed field
       		SearchGroup<BytesRef> g = i.next();
       		if(g.groupValue.bytesEquals(groupKey)){
@@ -176,7 +176,7 @@ public class SearchGroup2SecondPhaseShardResponseProcessor implements ShardRespo
       				newGroup.subGroups = mergedTopGroups;
       				newGroup.groupCount = groupCount.get(e.getKey());
       				i.remove();
-      				rb.mergedSearchGroups.get("site").add(newGroup);
+      				rb.mergedSearchGroups.get(field).add(newGroup);
       				break;
       			}
       		}

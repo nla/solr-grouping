@@ -266,21 +266,21 @@ public class QueryComponentGrouping2 extends QueryComponent{
               .setIncludeHitCount(false)
               .setSearcher(searcher);
           
-          for (String field : groupingSpec.getFields()) {
-            SchemaField schemaField = schema.getField(field);
-            String[] topGroupsParam = params.getParams(GroupParams.GROUP_DISTRIBUTED_TOPGROUPS_PREFIX + field);
-            if (topGroupsParam == null) {
-              topGroupsParam = new String[0];
-            }
+          String field = groupingSpec.getField();
+          SchemaField schemaField = schema.getField(field);
+          String[] topGroupsParam = params.getParams(GroupParams.GROUP_DISTRIBUTED_TOPGROUPS_PREFIX + field);
+          if (topGroupsParam == null) {
+          	topGroupsParam = new String[0];
+          }
 
-            Collection<SearchGroup<BytesRef>> topGroups = new ArrayList<>(topGroupsParam.length);
-            for (String topGroup : topGroupsParam) {
-              CollectedSearchGroup2<BytesRef> searchGroup = new CollectedSearchGroup2<>();
-              if (!topGroup.equals(TopGroupsShardRequestFactory.GROUP_NULL_VALUE)) {
-                searchGroup.groupValue = new BytesRef(schemaField.getType().readableToIndexed(topGroup));
-                topGroups.add(searchGroup);
-              }
-            }
+          Collection<SearchGroup<BytesRef>> topGroups = new ArrayList<>(topGroupsParam.length);
+          for (String topGroup : topGroupsParam) {
+          	CollectedSearchGroup2<BytesRef> searchGroup = new CollectedSearchGroup2<>();
+          	if (!topGroup.equals(TopGroupsShardRequestFactory.GROUP_NULL_VALUE)) {
+          		searchGroup.groupValue = new BytesRef(schemaField.getType().readableToIndexed(topGroup));
+          		topGroups.add(searchGroup);
+          	}
+          }
 
           String field2 = groupingSpec.getSubField();
           topsGroupsActionBuilder.addCommandField(new SearchGroups2FieldCommand.Builder()
@@ -292,7 +292,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
               .setSearchGroups(topGroups)
               .build()
         		);
-          }
+          
           CommandHandler commandHandler = topsGroupsActionBuilder.build();
           commandHandler.execute();
           SearchGroups2ResultTransformer serializer = new SearchGroups2ResultTransformer(searcher);
