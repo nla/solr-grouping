@@ -864,6 +864,9 @@ public class Grouping2 {
       List groupList = new ArrayList();
 
       if (result == null) {
+        NamedList<Object> grouped = new SimpleOrderedMap<>();
+        NamedList<Object> rec = new SimpleOrderedMap<>();
+//        grouped.add(field, rec);
         return;
       }
 

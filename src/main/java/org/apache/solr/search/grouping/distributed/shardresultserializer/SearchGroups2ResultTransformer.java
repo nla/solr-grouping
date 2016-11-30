@@ -82,7 +82,14 @@ public class SearchGroups2ResultTransformer implements ShardResultTransformer<Li
    */
   @Override
   public Map<String, CollectedSearchGroup2<BytesRef>> transformToNative(NamedList<NamedList> shardResponse, Sort groupSort, Sort sortWithinGroup, String shard) {
-    final Map<String, CollectedSearchGroup2<BytesRef>> result = new HashMap<>(shardResponse.size());
+  	int shardSize = 0;
+  	if(shardResponse != null){
+  		shardSize = shardResponse.size();
+  	}
+    final Map<String, CollectedSearchGroup2<BytesRef>> result = new HashMap<>(shardSize);
+    if(shardResponse == null){
+    	return result;
+    }
     for (Map.Entry<String, NamedList> command : shardResponse) {
       NamedList<NamedList> topGroupsAndGroupCount = command.getValue();
       for(Map.Entry<String, NamedList> e : topGroupsAndGroupCount){

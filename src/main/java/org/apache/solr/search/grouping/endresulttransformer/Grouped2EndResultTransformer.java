@@ -19,6 +19,7 @@ package org.apache.solr.search.grouping.endresulttransformer;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -27,7 +28,9 @@ import javax.xml.ws.Response;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.grouping.CollectedSearchGroup2;
 import org.apache.lucene.search.grouping.Group2Docs;
+import org.apache.lucene.search.grouping.GroupDocs;
 import org.apache.lucene.search.grouping.SearchGroup;
+import org.apache.lucene.search.grouping.TopGroups;
 import org.apache.lucene.search.grouping.TopGroups2;
 import org.apache.lucene.util.BytesRef;
 import org.apache.solr.common.SolrDocumentList;
@@ -56,14 +59,23 @@ public class Grouped2EndResultTransformer implements EndResultTransformer {
    */
   @Override
   public void transform(Map<String, ?> result, ResponseBuilder rb, SolrDocumentSource solrDocumentSource) {
+  	
+    String field = ((Grouping2Specification)rb.getGroupingSpec()).getField();
     NamedList<Object> grouped = new SimpleOrderedMap<>();
     NamedList<Object> groupContainer = new SimpleOrderedMap<>();
-    String field = ((Grouping2Specification)rb.getGroupingSpec()).getField();
     SchemaField schemaField = searcher.getSchema().getField(field);
     String subField = ((Grouping2Specification)rb.getGroupingSpec()).getSubField();
     SchemaField schemaSubField = searcher.getSchema().getField(subField);
     TopGroups2<BytesRef> topGroups = (TopGroups2<BytesRef>)rb.mergedTopGroups.get(field+"."+subField);
-    
+    if (topGroups == null) {
+    	rb.rsp.add("grouped", grouped);
+    	NamedList<Object> rec = new SimpleOrderedMap<>();
+    	grouped.add(field, rec);
+    	rec.add("matches", 0);
+    	rec.add("groups", new ArrayList<>());
+    	return;
+    }
+
     for (Map.Entry<String, Collection<SearchGroup<BytesRef>>> entry : rb.mergedSearchGroups.entrySet()) {
     	Collection<SearchGroup<BytesRef>> groups = entry.getValue();
     	long totalCount = 0;

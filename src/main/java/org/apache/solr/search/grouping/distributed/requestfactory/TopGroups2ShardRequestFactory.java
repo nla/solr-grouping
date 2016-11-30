@@ -55,6 +55,9 @@ public class TopGroups2ShardRequestFactory implements ShardRequestFactory {
    */
   @Override
   public ShardRequest[] constructRequest(ResponseBuilder rb) {
+  	if(rb.mergedSearchGroups.isEmpty()){
+  		return new ShardRequest[]{};
+  	}
 if(1==1) // for second level we need to check all shards
   return createRequestForAllShards(rb);
 
