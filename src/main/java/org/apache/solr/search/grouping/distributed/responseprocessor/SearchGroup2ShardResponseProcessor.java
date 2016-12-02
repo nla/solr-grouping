@@ -29,6 +29,7 @@ import org.apache.solr.handler.component.ShardRequest;
 import org.apache.solr.handler.component.ShardResponse;
 import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.search.SortSpec;
+import org.apache.solr.search.grouping.Grouping2Specification;
 import org.apache.solr.search.grouping.distributed.ShardResponseProcessor;
 import org.apache.solr.search.grouping.distributed.command.SearchGroupsFieldCommandResult;
 import org.apache.solr.search.grouping.distributed.shardresultserializer.SearchGroupsResultTransformer;
@@ -50,20 +51,19 @@ public class SearchGroup2ShardResponseProcessor implements ShardResponseProcesso
   public void process(ResponseBuilder rb, ShardRequest shardRequest) {
     SortSpec ss = rb.getSortSpec();
     Sort groupSort = rb.getGroupingSpec().getGroupSort();
-    final String[] fields = rb.getGroupingSpec().getFields();
+    Grouping2Specification groupSpec = (Grouping2Specification)rb.getGroupingSpec(); 
+    final String gField = groupSpec.getField();
     Sort sortWithinGroup = rb.getGroupingSpec().getSortWithinGroup();
     if (sortWithinGroup == null) { // TODO prevent it from being null in the first place
       sortWithinGroup = Sort.RELEVANCE;
     }
 
-    final Map<String, List<Collection<SearchGroup<BytesRef>>>> commandSearchGroups = new HashMap<>(fields.length, 1.0f);
-    final Map<String, Map<SearchGroup<BytesRef>, Set<String>>> tempSearchGroupToShards = new HashMap<>(fields.length, 1.0f);
-    for (String field : fields) {
-      commandSearchGroups.put(field, new ArrayList<Collection<SearchGroup<BytesRef>>>(shardRequest.responses.size()));
-      tempSearchGroupToShards.put(field, new HashMap<SearchGroup<BytesRef>, Set<String>>());
-      if (!rb.searchGroupToShards.containsKey(field)) {
-        rb.searchGroupToShards.put(field, new HashMap<SearchGroup<BytesRef>, Set<String>>());
-      }
+    final Map<String, List<Collection<SearchGroup<BytesRef>>>> commandSearchGroups = new HashMap<>(1, 1.0f);
+    final Map<String, Map<SearchGroup<BytesRef>, Set<String>>> tempSearchGroupToShards = new HashMap<>(1, 1.0f);
+    commandSearchGroups.put(gField, new ArrayList<Collection<SearchGroup<BytesRef>>>(shardRequest.responses.size()));
+    tempSearchGroupToShards.put(gField, new HashMap<SearchGroup<BytesRef>, Set<String>>());
+    if (!rb.searchGroupToShards.containsKey(gField)) {
+      rb.searchGroupToShards.put(gField, new HashMap<SearchGroup<BytesRef>, Set<String>>());
     }
 
     SearchGroupsResultTransformer serializer = new SearchGroupsResultTransformer(rb.req.getSearcher());

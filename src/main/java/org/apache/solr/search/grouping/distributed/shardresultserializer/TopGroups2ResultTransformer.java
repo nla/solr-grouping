@@ -146,7 +146,7 @@ public class TopGroups2ResultTransformer implements ShardResultTransformer<List<
 
         	BytesRef groupValueRef = groupValue != null ? new BytesRef(groupValue) : null;
         	BytesRef parentGroupValueRef = parentGroupValue != null ? new BytesRef(parentGroupValue) : null;
-        	System.out.println("add : "+ parentGroupValue + " : "+ groupValue);
+//        	System.out.println("add : "+ parentGroupValue + " : "+ groupValue);
         	groupDocs.add(new Group2Docs<>(Float.NaN, maxScore, totalGroupHits, scoreDocs, parentGroupValueRef, groupValueRef, null));
         }
       }

@@ -57,7 +57,8 @@ public class SearchGroup2SecondPhaseShardResponseProcessor implements ShardRespo
   public void process(ResponseBuilder rb, ShardRequest shardRequest) {
     SortSpec ss = rb.getSortSpec();
     Sort groupSort = rb.getGroupingSpec().getGroupSort();
-    final String field = ((Grouping2Specification)rb.getGroupingSpec()).getField();
+    Grouping2Specification groupSpec = (Grouping2Specification)rb.getGroupingSpec();
+    final String field = groupSpec.getField();
     Sort sortWithinGroup = rb.getGroupingSpec().getSortWithinGroup();
     if (sortWithinGroup == null) { // TODO prevent it from being null in the first place
       sortWithinGroup = Sort.RELEVANCE;
@@ -162,9 +163,9 @@ public class SearchGroup2SecondPhaseShardResponseProcessor implements ShardRespo
       }
       for(Map.Entry<String, List<Collection<SearchGroup<BytesRef>>>> e : all.entrySet()){ 
       	BytesRef groupKey = new BytesRef(e.getKey());
-      	Collection<SearchGroup<BytesRef>> mergedTopGroups = SearchGroup.merge(e.getValue(), ss.getOffset(), ss.getCount(), groupSort);
+      	Collection<SearchGroup<BytesRef>> mergedTopGroups = SearchGroup.merge(e.getValue(), groupSpec.getGroupOffset(), groupSpec.getGroupLimit(), groupSort);
       	Iterator<SearchGroup<BytesRef>> i = rb.mergedSearchGroups.get(field).iterator();
-      	while(i.hasNext()){// todo change to use passed field
+      	while(i.hasNext()){
       		SearchGroup<BytesRef> g = i.next();
       		if(g.groupValue.bytesEquals(groupKey)){
       			if(g instanceof CollectedSearchGroup2){

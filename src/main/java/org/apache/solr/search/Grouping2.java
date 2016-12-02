@@ -808,7 +808,7 @@ public class Grouping2 {
       int groupedDocsToCollect = getMax(groupOffset, docsPerGroup, maxDoc);
       groupedDocsToCollect = Math.max(groupedDocsToCollect, 1);
       secondPass = new TermSecondPassGrouping2Collector(
-      		groupBy, parentGroupBy, null, topGroups, groupSort,10
+      		groupBy, parentGroupBy, null, topGroups, groupSort, groupedDocsToCollect
       );
 
       if (totalCount == TotalCount.grouped) {
@@ -882,7 +882,7 @@ public class Grouping2 {
       	String readableValue = parentFieldType.indexedToReadable(group.groupParentValue.utf8ToString());
       	IndexableField field = schemaParentField.createField(readableValue, 1.0f);
       	if(!parentGroupValue.equals(readableValue)){
-      		System.out.println(readableValue);
+//      		System.out.println(readableValue);
       		NamedList<Object> parentRec = new SimpleOrderedMap<>();
       		parentGroupList.add(parentRec);
       		parentRec.add("groupValue", fieldType.toObject(field));

@@ -283,11 +283,14 @@ public class QueryComponentGrouping2 extends QueryComponent{
           }
 
           String field2 = groupingSpec.getSubField();
+          int topNGroups = groupingSpec.getGroupOffset() + groupingSpec.getGroupLimit();
+          topNGroups = Math.max(topNGroups, 1);
+
           topsGroupsActionBuilder.addCommandField(new SearchGroups2FieldCommand.Builder()
               .setField(schema.getField(field2))
               .setParentField(schema.getField(field))
               .setGroupSort(groupingSpec.getGroupSort())
-              .setTopNGroups(cmd.getOffset() + cmd.getLen())
+              .setTopNGroups(topNGroups)
               .setIncludeGroupCount(groupingSpec.isIncludeGroupCount())
               .setSearchGroups(topGroups)
               .build()
@@ -529,7 +532,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
 
   protected void handleGroupedResponses(ResponseBuilder rb, ShardRequest sreq) {
     ShardResponseProcessor responseProcessor = null;
-    System.out.println("XXXXXXXXXXXXXXXXXXXXXX  " + sreq.purpose);
+//    System.out.println("XXXXXXXXXXXXXXXXXXXXXX  " + sreq.purpose);
     if ((sreq.purpose & ShardRequest.PURPOSE_GET_TOP_GROUPS) != 0) {
       responseProcessor = new SearchGroup2ShardResponseProcessor();
     } else if ((sreq.purpose & ShardRequest.PURPOSE_GET_TOP_IDS) != 0) {

@@ -70,13 +70,11 @@ public abstract class AbstractThirdPassGrouping2Collector<GROUP_VALUE_TYPE> exte
     this.needsScores = getScores || getMaxScores || withinGroupSort.needsScores();
 
     this.groupMap = new HashMap<>(groups.size());
-    System.out.println("set up collector.");
     for (CollectedSearchGroup2<GROUP_VALUE_TYPE> group : groups) {
-    	System.out.println("     "+group.groupValue);
       //System.out.println("  prep group=" + (group.groupValue == null ? "null" : group.groupValue.utf8ToString()));
     	HashMap<GROUP_VALUE_TYPE, SearchGroupDocs<GROUP_VALUE_TYPE>> groupDocs = new HashMap<>(group.subGroups.size());
     	for(SearchGroup<GROUP_VALUE_TYPE> subGroup : group.subGroups){
-      	System.out.println("                    "+subGroup.groupValue);
+//      	System.out.println("                    "+subGroup.groupValue);
 	      final TopDocsCollector<?> collector;
 	      if (withinGroupSort.equals(Sort.RELEVANCE)) { // optimize to use TopScoreDocCollector
 	        // Sort by score
@@ -89,7 +87,7 @@ public abstract class AbstractThirdPassGrouping2Collector<GROUP_VALUE_TYPE> exte
     	}
       groupMap.put(group.groupValue, groupDocs);
     }
-    System.out.println("Fin set up collector.");
+//    System.out.println("Fin set up collector.");
   }
 
   @Override
@@ -143,13 +141,13 @@ public abstract class AbstractThirdPassGrouping2Collector<GROUP_VALUE_TYPE> exte
 
     int groupIDX = 0;
     float maxScore = Float.MIN_VALUE;
-    System.out.println("Get Top groups.");
+//    System.out.println("Get Top groups.");
     for(CollectedSearchGroup2<GROUP_VALUE_TYPE> group : groups) {
-    	System.out.println("       " + group.groupValue);
+//    	System.out.println("       " + group.groupValue);
     	final Map<GROUP_VALUE_TYPE, SearchGroupDocs<GROUP_VALUE_TYPE>> subMap = groupMap.get(group.groupValue);
       for(SearchGroup<GROUP_VALUE_TYPE> subGroup : (Collection<SearchGroup<GROUP_VALUE_TYPE>>)group.subGroups) {
 //    	for(Map.Entry<GROUP_VALUE_TYPE, SearchGroupDocs<GROUP_VALUE_TYPE>> e : subMap.entrySet()){
-      	System.out.println("              " + subGroup.groupValue);
+//      	System.out.println("              " + subGroup.groupValue);
 	      final SearchGroupDocs<GROUP_VALUE_TYPE> groupDocs = subMap.get(subGroup.groupValue);
 	      final TopDocs topDocs = groupDocs.collector.topDocs(withinGroupOffset, maxDocsPerGroup);
 	      groupDocsResult.add(new Group2Docs<>(Float.NaN,
