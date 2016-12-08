@@ -34,21 +34,21 @@ import java.util.*;
  *
  * @lucene.experimental
  */
-abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE> extends SimpleCollector {
+abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> extends SimpleCollector {
 
   private final FieldComparator<?>[] comparators;
   private final LeafFieldComparator[] leafComparators;
   private final int[] reversed;
   private final int topNGroups;
   private final boolean needsScores;
-  protected Map<GROUP_VALUE_TYPE, CollectedSearchGroup2<GROUP_VALUE_TYPE>> groupMap;
+  protected Map<GROUP_VALUE_TYPE, CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>> groupMap;
   private final int compIDXEnd;
-  protected Collection<CollectedSearchGroup2<GROUP_VALUE_TYPE>> topGroupsFirstPass;
-  protected Map<GROUP_VALUE_TYPE, AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE>> collectors;
+  protected Collection<CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>> topGroupsFirstPass;
+  protected Map<GROUP_VALUE_TYPE, AbstractSecondPassGrouping2Collector<SUBGROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>> collectors;
 
   // Set once we reach topNGroups unique groups:
   /** @lucene.internal */
-  protected TreeSet<CollectedSearchGroup2<GROUP_VALUE_TYPE>> orderedGroups;
+  protected TreeSet<CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>> orderedGroups;
   private int docBase;
   private int spareSlot;
 
@@ -99,14 +99,17 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE> ext
     return needsScores;
   }
 
-  public Collection<CollectedSearchGroup2<GROUP_VALUE_TYPE>> getTopGroupsNested(int groupOffset, boolean fillFields) {
+  public Collection<CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>> getTopGroupsNested(int groupOffset, boolean fillFields) {
   	// as this is the parent collector we go through the top groups from the first pass 
   	// and add the second level data
-  	for(CollectedSearchGroup2<GROUP_VALUE_TYPE> g : topGroupsFirstPass){
+  	for(CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> g : topGroupsFirstPass){
   		g.subGroups = collectors.get(g.groupValue).getTopGroups(groupOffset, fillFields);
   	}
   	return topGroupsFirstPass;
-  }  
+  }
+
+  protected abstract BytesRef getValueAsBytesRef(GROUP_VALUE_TYPE ref);
+
   /**
    * Returns top groups, starting from offset.  This may
    * return null, if no groups were collected, or if the
@@ -135,12 +138,12 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE> ext
     final Collection<SearchGroup<GROUP_VALUE_TYPE>> result = new ArrayList<>();
     int upto = 0;
     final int sortFieldCount = comparators.length;
-    for(CollectedSearchGroup2<GROUP_VALUE_TYPE> group : orderedGroups) {
+    for(CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> group : orderedGroups) {
       if (upto++ < groupOffset) {
         continue;
       }
       //System.out.println("  group=" + (group.groupValue == null ? "null" : group.groupValue.utf8ToString()));
-      CollectedSearchGroup2<GROUP_VALUE_TYPE> searchGroup = new CollectedSearchGroup2<>();
+      CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> searchGroup = new CollectedSearchGroup2<>();
       searchGroup.groupValue = group.groupValue;
       if (fillFields) {
         searchGroup.sortValues = new Object[sortFieldCount];
@@ -170,7 +173,7 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE> ext
   public void collect(int doc) throws IOException {
   	if(collectors != null){
       final GROUP_VALUE_TYPE groupParentValue = getDocGroupParentValue(doc);
-      AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE> collector = collectors.get(groupParentValue);
+      AbstractSecondPassGrouping2Collector<SUBGROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> collector = collectors.get(groupParentValue);
       if(collector == null){
       	return; // not collecting this record
       }
@@ -212,7 +215,7 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE> ext
     // TODO: should we add option to mean "ignore docs that
     // don't have the group field" (instead of stuffing them
     // under null group)?
-    final CollectedSearchGroup2<GROUP_VALUE_TYPE> group;
+    final CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> group;
     final GROUP_VALUE_TYPE groupValue;
 
     groupValue = getDocGroupValue(doc);
@@ -231,7 +234,7 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE> ext
         // just keep collecting them
 
         // Add a new CollectedSearchGroup:
-        CollectedSearchGroup2<GROUP_VALUE_TYPE> sg = new CollectedSearchGroup2<>();
+        CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> sg = new CollectedSearchGroup2<>();
         sg.groupValue = copyDocGroupValue(groupValue, null);
         sg.comparatorSlot = groupMap.size();
 //        sg.subGroupMap = new HashMap<>();
@@ -252,7 +255,7 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE> ext
       }
       // We already tested that the document is competitive, so replace
       // the bottom group with this new group.
-      final CollectedSearchGroup2<GROUP_VALUE_TYPE> bottomGroup = orderedGroups.pollLast();
+      final CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> bottomGroup = orderedGroups.pollLast();
       assert orderedGroups.size() == topNGroups -1;
 
       groupMap.remove(bottomGroup.groupValue);
@@ -360,25 +363,25 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE> ext
   @Override
   protected void doSetNextReader(LeafReaderContext readerContext) throws IOException {
     docBase = readerContext.docBase;
-    for(AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE> c : collectors.values()){
+    for(AbstractSecondPassGrouping2Collector<SUBGROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> c : collectors.values()){
 	    for (int i=0; i<c.comparators.length; i++) {
 	      c.leafComparators[i] = c.comparators[i].getLeafComparator(readerContext);
 	    }
     }
   }
 
-  public Map<GROUP_VALUE_TYPE, CollectedSearchGroup2<GROUP_VALUE_TYPE>> getGroupMap(){
+  public Map<GROUP_VALUE_TYPE, CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>> getGroupMap(){
 		return groupMap;
 	}
-  public void setGroupMap(Map<GROUP_VALUE_TYPE, CollectedSearchGroup2<GROUP_VALUE_TYPE>> map){
+  public void setGroupMap(Map<GROUP_VALUE_TYPE, CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>> map){
   	this.groupMap = map;
 	}
   
-  public Collection<CollectedSearchGroup2<GROUP_VALUE_TYPE>> getTopGroupsFirstPass(){
+  public Collection<CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>> getTopGroupsFirstPass(){
 		return topGroupsFirstPass;
 	}
   
-  public AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE> getCollectors(GROUP_VALUE_TYPE ref){
+  public AbstractSecondPassGrouping2Collector<SUBGROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> getCollectors(GROUP_VALUE_TYPE ref){
 		return collectors.get(ref);
 	}
   

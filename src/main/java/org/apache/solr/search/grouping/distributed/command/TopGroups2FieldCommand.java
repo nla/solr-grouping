@@ -53,7 +53,7 @@ public class TopGroups2FieldCommand implements Command<TopGroups<BytesRef>> {
     private SchemaField parentField;
     private Sort groupSort;
     private Sort sortWithinGroup;
-    private Collection<CollectedSearchGroup2<BytesRef>> firstPhaseGroups;
+    private Collection<CollectedSearchGroup2<BytesRef, BytesRef>> firstPhaseGroups;
     private Integer maxDocPerGroup;
     private boolean needScores = false;
     private boolean needMaxScore = false;
@@ -78,7 +78,7 @@ public class TopGroups2FieldCommand implements Command<TopGroups<BytesRef>> {
       return this;
     }
 
-    public Builder setFirstPhaseGroups(Collection<CollectedSearchGroup2<BytesRef>> firstPhaseGroups) {
+    public Builder setFirstPhaseGroups(Collection<CollectedSearchGroup2<BytesRef, BytesRef>> firstPhaseGroups) {
       this.firstPhaseGroups = firstPhaseGroups;
       return this;
     }
@@ -113,7 +113,7 @@ public class TopGroups2FieldCommand implements Command<TopGroups<BytesRef>> {
   private final SchemaField parentField;
   private final Sort groupSort;
   private final Sort sortWithinGroup;
-  private final Collection<CollectedSearchGroup2<BytesRef>> firstPhaseGroups;
+  private final Collection<CollectedSearchGroup2<BytesRef, BytesRef>> firstPhaseGroups;
   private final int maxDocPerGroup;
   private final boolean needScores;
   private final boolean needMaxScore;
@@ -122,7 +122,7 @@ public class TopGroups2FieldCommand implements Command<TopGroups<BytesRef>> {
   private TopGroups2FieldCommand(SchemaField field, SchemaField parentField,
                                 Sort groupSort,
                                 Sort sortWithinGroup,
-                                Collection<CollectedSearchGroup2<BytesRef>> firstPhaseGroups,
+                                Collection<CollectedSearchGroup2<BytesRef, BytesRef>> firstPhaseGroups,
                                 int maxDocPerGroup,
                                 boolean needScores,
                                 boolean needMaxScore) {

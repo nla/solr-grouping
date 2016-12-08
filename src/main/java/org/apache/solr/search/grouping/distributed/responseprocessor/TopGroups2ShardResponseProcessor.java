@@ -131,7 +131,7 @@ public class TopGroups2ShardResponseProcessor implements ShardResponseProcessor 
       int numFound = 0;
       float maxScore = Float.NaN;
       for (String f : commandTopGroups.keySet()) {
-        TopGroups2<BytesRef> topGroups = (TopGroups2<BytesRef>) result.get(f);
+        TopGroups2<BytesRef, BytesRef> topGroups = (TopGroups2<BytesRef, BytesRef>) result.get(f);
         if (topGroups == null) {
           continue;
         }
@@ -157,12 +157,12 @@ public class TopGroups2ShardResponseProcessor implements ShardResponseProcessor 
     }
     try {
       for (String groupField : commandTopGroups.keySet()) {
-        List<TopGroups2<BytesRef>> topGroups = (List)commandTopGroups.get(groupField);
+        List<TopGroups2<BytesRef, BytesRef>> topGroups = (List)commandTopGroups.get(groupField);
         if (topGroups.isEmpty()) {
           continue;
         }
 
-        TopGroups2<BytesRef>[] topGroupsArr = new TopGroups2[topGroups.size()];
+        TopGroups2<BytesRef, BytesRef>[] topGroupsArr = new TopGroups2[topGroups.size()];
         topGroupsArr =topGroups.toArray(topGroupsArr);
         rb.mergedTopGroups.put(groupField, TopGroups2.merge(topGroupsArr, groupSort, sortWithinGroup, groupOffsetDefault, docsPerGroupDefault, TopGroups2.ScoreMergeMode.None));
       }

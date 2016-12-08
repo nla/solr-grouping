@@ -40,21 +40,21 @@ import java.util.Objects;
  *
  * @lucene.experimental
  */
-public abstract class AbstractThirdPassGrouping2Collector<GROUP_VALUE_TYPE> extends SimpleCollector {
+public abstract class AbstractThirdPassGrouping2Collector<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> extends SimpleCollector {
 
-  private final Collection<CollectedSearchGroup2<GROUP_VALUE_TYPE>> groups;
+  private final Collection<CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>> groups;
   private final Sort groupSort;
   private final Sort withinGroupSort;
   private final int maxDocsPerGroup;
   private final boolean needsScores;
-  protected final Map<GROUP_VALUE_TYPE, Map<GROUP_VALUE_TYPE, SearchGroupDocs<GROUP_VALUE_TYPE>>> groupMap;
+  protected final Map<GROUP_VALUE_TYPE, Map<SUBGROUP_VALUE_TYPE, SearchGroupDocs<GROUP_VALUE_TYPE>>> groupMap;
 
   protected SearchGroupDocs<GROUP_VALUE_TYPE>[][] groupDocs;
 
   private long totalHitCount;
   private int totalGroupedHitCount;
 
-  public AbstractThirdPassGrouping2Collector(Collection<CollectedSearchGroup2<GROUP_VALUE_TYPE>> groups, Sort groupSort, Sort withinGroupSort,
+  public AbstractThirdPassGrouping2Collector(Collection<CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>> groups, Sort groupSort, Sort withinGroupSort,
                                              int maxDocsPerGroup, boolean getScores, boolean getMaxScores, boolean fillSortFields)
     throws IOException {
 
@@ -70,10 +70,10 @@ public abstract class AbstractThirdPassGrouping2Collector<GROUP_VALUE_TYPE> exte
     this.needsScores = getScores || getMaxScores || withinGroupSort.needsScores();
 
     this.groupMap = new HashMap<>(groups.size());
-    for (CollectedSearchGroup2<GROUP_VALUE_TYPE> group : groups) {
+    for (CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> group : groups) {
       //System.out.println("  prep group=" + (group.groupValue == null ? "null" : group.groupValue.utf8ToString()));
-    	HashMap<GROUP_VALUE_TYPE, SearchGroupDocs<GROUP_VALUE_TYPE>> groupDocs = new HashMap<>(group.subGroups.size());
-    	for(SearchGroup<GROUP_VALUE_TYPE> subGroup : group.subGroups){
+    	HashMap<SUBGROUP_VALUE_TYPE, SearchGroupDocs<GROUP_VALUE_TYPE>> groupDocs = new HashMap<>(group.subGroups.size());
+    	for(SearchGroup<SUBGROUP_VALUE_TYPE> subGroup : group.subGroups){
 //      	System.out.println("                    "+subGroup.groupValue);
 	      final TopDocsCollector<?> collector;
 	      if (withinGroupSort.equals(Sort.RELEVANCE)) { // optimize to use TopScoreDocCollector
@@ -128,7 +128,7 @@ public abstract class AbstractThirdPassGrouping2Collector<GROUP_VALUE_TYPE> exte
   @Override
   protected void doSetNextReader(LeafReaderContext readerContext) throws IOException {
     //System.out.println("SP.setNextReader");
-    for (Map<GROUP_VALUE_TYPE,SearchGroupDocs<GROUP_VALUE_TYPE>> parentGroup : groupMap.values()) {
+    for (Map<SUBGROUP_VALUE_TYPE,SearchGroupDocs<GROUP_VALUE_TYPE>> parentGroup : groupMap.values()) {
       for (SearchGroupDocs<GROUP_VALUE_TYPE> group : parentGroup.values()) {
       	group.leafCollector = group.collector.getLeafCollector(readerContext);
       }
@@ -137,15 +137,15 @@ public abstract class AbstractThirdPassGrouping2Collector<GROUP_VALUE_TYPE> exte
 
   public TopGroups<GROUP_VALUE_TYPE> getTopGroups(int withinGroupOffset) {
     @SuppressWarnings({"unchecked","rawtypes"})
-    final List<Group2Docs<GROUP_VALUE_TYPE>> groupDocsResult = new ArrayList<>();
+    final List<Group2Docs<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>> groupDocsResult = new ArrayList<>();
 
     int groupIDX = 0;
     float maxScore = Float.MIN_VALUE;
 //    System.out.println("Get Top groups.");
-    for(CollectedSearchGroup2<GROUP_VALUE_TYPE> group : groups) {
+    for(CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> group : groups) {
 //    	System.out.println("       " + group.groupValue);
-    	final Map<GROUP_VALUE_TYPE, SearchGroupDocs<GROUP_VALUE_TYPE>> subMap = groupMap.get(group.groupValue);
-      for(SearchGroup<GROUP_VALUE_TYPE> subGroup : (Collection<SearchGroup<GROUP_VALUE_TYPE>>)group.subGroups) {
+    	final Map<SUBGROUP_VALUE_TYPE, SearchGroupDocs<GROUP_VALUE_TYPE>> subMap = groupMap.get(group.groupValue);
+      for(SearchGroup<SUBGROUP_VALUE_TYPE> subGroup : (Collection<SearchGroup<SUBGROUP_VALUE_TYPE>>)group.subGroups) {
 //    	for(Map.Entry<GROUP_VALUE_TYPE, SearchGroupDocs<GROUP_VALUE_TYPE>> e : subMap.entrySet()){
 //      	System.out.println("              " + subGroup.groupValue);
 	      final SearchGroupDocs<GROUP_VALUE_TYPE> groupDocs = subMap.get(subGroup.groupValue);
@@ -171,13 +171,13 @@ public abstract class AbstractThirdPassGrouping2Collector<GROUP_VALUE_TYPE> exte
   // TODO: merge with SearchGroup or not?
   // ad: don't need to build a new hashmap
   // disad: blows up the size of SearchGroup if we need many of them, and couples implementations
-  public class SearchGroupDocs<GROUP_VALUE_TYPE> {
+  public class SearchGroupDocs<TYPE> {
 
-    public final GROUP_VALUE_TYPE groupValue;
+    public final TYPE groupValue;
     public final TopDocsCollector<?> collector;
     public LeafCollector leafCollector;
 
-    public SearchGroupDocs(GROUP_VALUE_TYPE groupValue, TopDocsCollector<?> collector) {
+    public SearchGroupDocs(TYPE groupValue, TopDocsCollector<?> collector) {
       this.groupValue = groupValue;
       this.collector = collector;
     }

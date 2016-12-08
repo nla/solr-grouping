@@ -59,6 +59,7 @@ import org.apache.lucene.search.grouping.function.FunctionAllGroupHeadsCollector
 import org.apache.lucene.search.grouping.function.FunctionAllGroupsCollector;
 import org.apache.lucene.search.grouping.function.FunctionFirstPassGroupingCollector;
 import org.apache.lucene.search.grouping.function.FunctionSecondPassGroupingCollector;
+import org.apache.lucene.search.grouping.term.FunctionSecondPassGrouping2Collector;
 import org.apache.lucene.search.grouping.term.TermAllGroupHeadsCollector;
 import org.apache.lucene.search.grouping.term.TermAllGroupsCollector;
 import org.apache.lucene.search.grouping.term.TermFirstPassGroupingCollector;
@@ -75,6 +76,7 @@ import org.apache.solr.schema.FieldType;
 import org.apache.solr.schema.SchemaField;
 import org.apache.solr.schema.StrFieldSource;
 import org.apache.solr.search.grouping.collector.FilterCollector;
+import org.apache.solr.search.grouping.distributed.command.Group2Converter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -143,7 +145,7 @@ public class Grouping2 {
     this.main = main;
   }
 
-  public void add(Grouping2.Command groupingCommand) {
+  public void add(Grouping2.Command groupingCommand){
     commands.add(groupingCommand);
   }
 
@@ -159,22 +161,22 @@ public class Grouping2 {
     FieldType fieldType = schemaField.getType();
     ValueSource valueSource = fieldType.getValueSource(schemaField, null);
     if (!(valueSource instanceof StrFieldSource)) {
-      addFunctionCommand(field, request);
+      addFunctionCommand(field, subField, request);
       return;
     }
-    schemaField = searcher.getSchema().getField(subField); // Throws an exception when field doesn't exist. Bad request.
-    fieldType = schemaField.getType();
-    valueSource = fieldType.getValueSource(schemaField, null);
+    SchemaField schemaSubField = searcher.getSchema().getField(subField); // Throws an exception when field doesn't exist. Bad request.
+    fieldType = schemaSubField.getType();
+    valueSource = fieldType.getValueSource(schemaSubField, null);
     if (!(valueSource instanceof StrFieldSource)) {
-      addFunctionCommand(field, request);
+      addFunctionCommand(field, subField, request);
       throw new IllegalArgumentException("only string sub fields supported at the moment.");
 //      return;
     }
 
     Grouping2.CommandField gc = new CommandField();
     gc.withinGroupSort = withinGroupSort;
-    gc.groupBy = subField;
-    gc.parentGroupBy = field;
+    gc.groupBy = schemaField;
+    gc.parentGroupBy = schemaSubField;
     gc.key = field;
     gc.numGroups = limitDefault;
     gc.docsPerGroup = docsPerGroupDefault;
@@ -195,7 +197,7 @@ public class Grouping2 {
     commands.add(gc);
   }
 
-  public void addFunctionCommand(String groupByStr, SolrQueryRequest request) throws SyntaxError {
+  public void addFunctionCommand(String groupByStr, String subField, SolrQueryRequest request) throws SyntaxError {
     QParser parser = QParser.getParser(groupByStr, "func", request);
     Query q = parser.getQuery();
     final Grouping2.Command gc;
@@ -204,16 +206,18 @@ public class Grouping2 {
       if (valueSource instanceof StrFieldSource) {
         String field = ((StrFieldSource) valueSource).getField();
         CommandField commandField = new CommandField();
-        commandField.groupBy = field;
+        commandField.groupBy = searcher.getSchema().getField(field);
         gc = commandField;
       } else {
         CommandFunc commandFunc = new CommandFunc();
-        commandFunc.groupBy = valueSource;
+        commandFunc.groupByVS = valueSource;
+        commandFunc.groupBy = searcher.getSchema().getField(subField);
+        commandFunc.parentGroupBy = searcher.getSchema().getField(groupByStr);
         gc = commandFunc;
       }
     } else {
       CommandFunc commandFunc = new CommandFunc();
-      commandFunc.groupBy = new QueryValueSource(q, 0.0f);
+      commandFunc.groupByVS = new QueryValueSource(q, 0.0f);
       gc = commandFunc;
     }
     gc.withinGroupSort = withinGroupSort;
@@ -559,7 +563,7 @@ public class Grouping2 {
    * Note: Maybe the creating the response structure should be done in something like a ReponseBuilder???
    * Warning NOT thread save!
    */
-  public abstract class Command<GROUP_VALUE_TYPE> {
+  public abstract class Command<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> {
 
     public String key;       // the name to use for this group in the response
     public Sort withinGroupSort;   // the sort of the documents *within* a single group.
@@ -573,7 +577,7 @@ public class Grouping2 {
     public boolean main;     // use as the main result in simple format (grouped.main=true param)
     public TotalCount totalCount = TotalCount.ungrouped;
 
-    TopGroups2<GROUP_VALUE_TYPE> result;
+    TopGroups2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> result;
 
 
     /**
@@ -746,10 +750,10 @@ public class Grouping2 {
   /**
    * A group command for grouping on a field.
    */
-  public class CommandField extends Command<BytesRef> {
+  public class CommandField extends Command<BytesRef, BytesRef> {
 
-    public String groupBy;
-    public String parentGroupBy;
+    public SchemaField groupBy;
+    public SchemaField parentGroupBy;
     TermFirstPassGroupingCollector firstPass;
     TermSecondPassGrouping2Collector secondPass;
     TermThirdPassGrouping2Collector thirdPass;
@@ -780,7 +784,7 @@ public class Grouping2 {
       }
 
       groupSort = groupSort == null ? Sort.RELEVANCE : groupSort;
-      firstPass = new TermFirstPassGroupingCollector(parentGroupBy, groupSort, actualGroupsToFind);
+      firstPass = new TermFirstPassGroupingCollector(parentGroupBy.getName(), groupSort, actualGroupsToFind);
       return firstPass;
     }
 
@@ -790,13 +794,13 @@ public class Grouping2 {
     @Override
     protected Collector createSecondPassCollector() throws IOException {
       if (actualGroupsToFind <= 0) {
-        allGroupsCollector = new TermAllGroupsCollector(groupBy);
+        allGroupsCollector = new TermAllGroupsCollector(groupBy.getName());
         return totalCount == TotalCount.grouped ? allGroupsCollector : null;
       }
       topGroups = format == Format.grouped ? firstPass.getTopGroups(offset, false) : firstPass.getTopGroups(0, false);
       if (topGroups == null) {
         if (totalCount == TotalCount.grouped) {
-          allGroupsCollector = new TermAllGroupsCollector(groupBy);
+          allGroupsCollector = new TermAllGroupsCollector(groupBy.getName());
           fallBackCollector = new TotalHitCountCollector();
           return MultiCollector.wrap(allGroupsCollector, fallBackCollector);
         } else {
@@ -808,11 +812,11 @@ public class Grouping2 {
       int groupedDocsToCollect = getMax(groupOffset, docsPerGroup, maxDoc);
       groupedDocsToCollect = Math.max(groupedDocsToCollect, 1);
       secondPass = new TermSecondPassGrouping2Collector(
-      		groupBy, parentGroupBy, null, topGroups, groupSort, groupedDocsToCollect
+      		groupBy.getName(), parentGroupBy.getName(), null, topGroups, groupSort, groupedDocsToCollect
       );
 
       if (totalCount == TotalCount.grouped) {
-        allGroupsCollector = new TermAllGroupsCollector(groupBy);
+        allGroupsCollector = new TermAllGroupsCollector(groupBy.getName());
         return MultiCollector.wrap(secondPass, allGroupsCollector);
       } else {
         return secondPass;
@@ -827,8 +831,8 @@ public class Grouping2 {
       Sort withinGroupSort = this.withinGroupSort != null ? this.withinGroupSort : Sort.RELEVANCE;
       int groupedDocsToCollect = getMax(groupOffset, docsPerGroup, maxDoc);
       groupedDocsToCollect = Math.max(groupedDocsToCollect, 1);
-    	Collection<CollectedSearchGroup2<BytesRef>> topGroups = secondPass.getTopGroupsNested(groupOffset, false);
-    	thirdPass = new TermThirdPassGrouping2Collector(groupBy, parentGroupBy, topGroups, groupSort, withinGroupSort, groupedDocsToCollect, needScores, needScores, false);
+    	Collection<CollectedSearchGroup2<BytesRef, BytesRef>> topGroups = secondPass.getTopGroupsNested(groupOffset, false);
+    	thirdPass = new TermThirdPassGrouping2Collector(groupBy.getName(), parentGroupBy.getName(), topGroups, groupSort, withinGroupSort, groupedDocsToCollect, needScores, needScores, false);
     	return thirdPass;
     }
 
@@ -838,7 +842,7 @@ public class Grouping2 {
     @Override
     public AbstractAllGroupHeadsCollector<?> createAllGroupCollector() throws IOException {
       Sort sortWithinGroup = withinGroupSort != null ? withinGroupSort : Sort.RELEVANCE;
-      return TermAllGroupHeadsCollector.create(groupBy, sortWithinGroup);
+      return TermAllGroupHeadsCollector.create(groupBy.getName(), sortWithinGroup);
     }
 
     /**
@@ -846,7 +850,7 @@ public class Grouping2 {
      */
     @Override
     protected void finish() throws IOException {
-      result = thirdPass != null ? (TopGroups2<BytesRef>)thirdPass.getTopGroups(0) : null;
+      result = thirdPass != null ? (TopGroups2<BytesRef, BytesRef>)thirdPass.getTopGroups(0) : null;
       if (main) {
         mainResult = createSimpleResponse();
         return;
@@ -873,12 +877,12 @@ public class Grouping2 {
       // handle case of rows=0
       if (numGroups == 0) return;
 
-      SchemaField schemaField = searcher.getSchema().getField(groupBy);
+      SchemaField schemaField = groupBy;
       FieldType fieldType = schemaField.getType();
-      SchemaField schemaParentField = searcher.getSchema().getField(parentGroupBy);
+      SchemaField schemaParentField = parentGroupBy;
       FieldType parentFieldType = schemaParentField.getType();
       String parentGroupValue = "";
-      for (Group2Docs<BytesRef> group : result.groups) {
+      for (Group2Docs<BytesRef, BytesRef> group : result.groups) {
       	String readableValue = parentFieldType.indexedToReadable(group.groupParentValue.utf8ToString());
       	IndexableField field = schemaParentField.createField(readableValue, 1.0f);
       	if(!parentGroupValue.equals(readableValue)){
@@ -892,7 +896,7 @@ public class Grouping2 {
       		NamedList<Object> subRec = new SimpleOrderedMap<>();
           groupList = new ArrayList();
           parentRec.add("subGrouped", subGrouped);
-          subGrouped.add(groupBy, subKey);
+          subGrouped.add(groupBy.getName(), subKey);
           // have to get the count from the second pass collector
           long count = secondPass.getCollectors(group.groupParentValue).getTotalHitCount();
           subKey.add("matches", count);
@@ -1005,17 +1009,21 @@ public class Grouping2 {
   /**
    * A command for grouping on a function.
    */
-  public class CommandFunc extends Command<MutableValue> {
+  public class CommandFunc extends Command<MutableValue, MutableValue> {
 
-    public ValueSource groupBy;
+    public ValueSource groupByVS;
     Map context;
 
+    public SchemaField groupBy;
+    public SchemaField parentGroupBy;
     FunctionFirstPassGroupingCollector firstPass;
-    FunctionSecondPassGroupingCollector secondPass;
+    FunctionSecondPassGrouping2Collector secondPass;
+//    FunctionThirdPassGrouping2Collector thirdPass;
+    
     // If offset falls outside the number of documents a group can provide use this collector instead of secondPass
     TotalHitCountCollector fallBackCollector;
     FunctionAllGroupsCollector allGroupsCollector;
-    Collection<SearchGroup<MutableValue>> topGroups;
+    Collection<SearchGroup<BytesRef>> topGroups;
 
     /**
      * {@inheritDoc}
@@ -1023,7 +1031,7 @@ public class Grouping2 {
     @Override
     protected void prepare() throws IOException {
       context = ValueSource.newContext(searcher);
-      groupBy.createWeight(context, searcher);
+      groupByVS.createWeight(context, searcher);
       actualGroupsToFind = getMax(offset, numGroups, maxDoc);
     }
 
@@ -1039,7 +1047,7 @@ public class Grouping2 {
       }
 
       groupSort = groupSort == null ? Sort.RELEVANCE : groupSort;
-      firstPass = new FunctionFirstPassGroupingCollector(groupBy, context, searcher.weightSort(groupSort), actualGroupsToFind);
+      firstPass = new FunctionFirstPassGroupingCollector(groupByVS, context, searcher.weightSort(groupSort), actualGroupsToFind);
       return firstPass;
     }
 
@@ -1048,42 +1056,43 @@ public class Grouping2 {
      */
     @Override
     protected Collector createSecondPassCollector() throws IOException {
-      if (actualGroupsToFind <= 0) {
-        allGroupsCollector = new FunctionAllGroupsCollector(groupBy, context);
-        return totalCount == TotalCount.grouped ? allGroupsCollector : null;
-      }
+//      if (actualGroupsToFind <= 0) {
+//        allGroupsCollector = new FunctionAllGroupsCollector(groupBy, context);
+//        return totalCount == TotalCount.grouped ? allGroupsCollector : null;
+//      }
 
-      topGroups = format == Format.grouped ? firstPass.getTopGroups(offset, false) : firstPass.getTopGroups(0, false);
-      if (topGroups == null) {
-        if (totalCount == TotalCount.grouped) {
-          allGroupsCollector = new FunctionAllGroupsCollector(groupBy, context);
-          fallBackCollector = new TotalHitCountCollector();
-          return MultiCollector.wrap(allGroupsCollector, fallBackCollector);
-        } else {
-          fallBackCollector = new TotalHitCountCollector();
-          return fallBackCollector;
-        }
-      }
+//      topGroups = format == Format.grouped ? firstPass.getTopGroups(offset, false) : firstPass.getTopGroups(0, false);
+//      if (topGroups == null) {
+//        if (totalCount == TotalCount.grouped) {
+//          allGroupsCollector = new FunctionAllGroupsCollector(groupBy, context);
+//          fallBackCollector = new TotalHitCountCollector();
+//          return MultiCollector.wrap(allGroupsCollector, fallBackCollector);
+//        } else {
+//          fallBackCollector = new TotalHitCountCollector();
+//          return fallBackCollector;
+//        }
+//      }
+      topGroups = Group2Converter.fromMutable(parentGroupBy, firstPass.getTopGroups(offset, false));
 
       int groupdDocsToCollect = getMax(groupOffset, docsPerGroup, maxDoc);
       groupdDocsToCollect = Math.max(groupdDocsToCollect, 1);
       Sort withinGroupSort = this.withinGroupSort != null ? this.withinGroupSort : Sort.RELEVANCE;
-      secondPass = new FunctionSecondPassGroupingCollector(
-          topGroups, groupSort, withinGroupSort, groupdDocsToCollect, needScores, needScores, false, groupBy, context
+      secondPass = new FunctionSecondPassGrouping2Collector(groupBy, parentGroupBy, null,
+          topGroups, groupSort, groupdDocsToCollect
       );
 
-      if (totalCount == TotalCount.grouped) {
-        allGroupsCollector = new FunctionAllGroupsCollector(groupBy, context);
-        return MultiCollector.wrap(secondPass, allGroupsCollector);
-      } else {
+//      if (totalCount == TotalCount.grouped) {
+//        allGroupsCollector = new FunctionAllGroupsCollector(groupBy, context);
+//        return MultiCollector.wrap(secondPass, allGroupsCollector);
+//      } else {
         return secondPass;
-      }
+//      }
     }
 
     @Override
     public AbstractAllGroupHeadsCollector<?> createAllGroupCollector() throws IOException {
       Sort sortWithinGroup = withinGroupSort != null ? withinGroupSort : Sort.RELEVANCE;
-      return new FunctionAllGroupHeadsCollector(groupBy, context, sortWithinGroup);
+      return new FunctionAllGroupHeadsCollector(groupByVS, context, sortWithinGroup);
     }
 
     /**

@@ -31,6 +31,7 @@ import org.apache.lucene.search.grouping.AbstractAllGroupsCollector;
 import org.apache.lucene.search.grouping.AbstractSecondPassGrouping2Collector;
 import org.apache.lucene.search.grouping.SearchGroup;
 import org.apache.lucene.search.grouping.function.FunctionAllGroupsCollector;
+import org.apache.lucene.search.grouping.term.FunctionSecondPassGrouping2Collector;
 import org.apache.lucene.search.grouping.term.TermAllGroupsCollector;
 import org.apache.lucene.search.grouping.term.TermSecondPassGrouping2Collector;
 import org.apache.lucene.util.BytesRef;
@@ -119,9 +120,8 @@ public class SearchGroups2FieldCommand implements Command<SearchGroupsFieldComma
     final FieldType fieldType = field.getType();
     if (topNGroups > 0) {
       if (fieldType.getNumericType() != null) {
-        ValueSource vs = fieldType.getValueSource(field, null);
-        throw new IllegalStateException("Not supported FunctionFirstPassGrouping2Collector");
-//        firstPassGroupingCollector = new FunctionFirstPassGroupingCollector(vs, new HashMap<Object,Object>(), groupSort, topNGroups);
+      	secondPassGroupingCollector = new FunctionSecondPassGrouping2Collector(field, parentField, 
+        		null,  searchGroups, groupSort, topNGroups);
       } else {
       	secondPassGroupingCollector = new TermSecondPassGrouping2Collector(field.getName(), parentField.getName(), 
         		null,  searchGroups, groupSort, topNGroups);
@@ -151,11 +151,11 @@ public class SearchGroups2FieldCommand implements Command<SearchGroupsFieldComma
   public SearchGroupsFieldCommandResult result() {
     final Collection<SearchGroup<BytesRef>> topGroups;
     if (secondPassGroupingCollector != null) {
-      if (field.getType().getNumericType() != null) {
-        topGroups = GroupConverter.fromMutable(field, secondPassGroupingCollector.getTopGroupsNested(0, true));
-      } else {
+//      if (field.getType().getNumericType() != null) {
+//        topGroups = GroupConverter.fromMutable(field, secondPassGroupingCollector.getTopGroupsNested(0, true));
+//      } else {
         topGroups = secondPassGroupingCollector.getTopGroupsNested(0, true);
-      }
+//      }
     } else {
       topGroups = Collections.emptyList();
     }

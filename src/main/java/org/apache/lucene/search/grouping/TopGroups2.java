@@ -27,20 +27,21 @@ import java.io.IOException;
 /** Represents result returned by a grouping search.
  *
  * @lucene.experimental */
-public class TopGroups2<GROUP_VALUE_TYPE> extends TopGroups<GROUP_VALUE_TYPE>{
+public class TopGroups2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> extends TopGroups<GROUP_VALUE_TYPE>{
 
   /** Group results in groupSort order */
-  public final Group2Docs<GROUP_VALUE_TYPE>[] groups;
+  public final Group2Docs<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>[] groups;
   /** Number of documents matching the search */
   public final long totalHitCount;
 
-  public TopGroups2(SortField[] groupSort, SortField[] withinGroupSort, long totalHitCount, int totalGroupedHitCount, Group2Docs<GROUP_VALUE_TYPE>[] groups, float maxScore) {
-  	super(groupSort, withinGroupSort, 0, totalGroupedHitCount, groups, maxScore);
+  public TopGroups2(SortField[] groupSort, SortField[] withinGroupSort, long totalHitCount, 
+  		int totalGroupedHitCount, Group2Docs<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>[] groups, float maxScore) {
+  	super(groupSort, withinGroupSort, 0, totalGroupedHitCount, (GroupDocs<GROUP_VALUE_TYPE>[]) groups, maxScore);
     this.groups = groups;
     this.totalHitCount = totalHitCount;
   }
 
-  public TopGroups2(TopGroups2<GROUP_VALUE_TYPE> oldTopGroups, Integer totalGroupCount) {
+  public TopGroups2(TopGroups2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> oldTopGroups, Integer totalGroupCount) {
   	super(oldTopGroups, totalGroupCount);
     this.groups = oldTopGroups.groups;
     this.totalHitCount = oldTopGroups.totalHitCount;
@@ -63,7 +64,7 @@ public class TopGroups2<GROUP_VALUE_TYPE> extends TopGroups<GROUP_VALUE_TYPE>{
    * <b>NOTE</b>: the topDocs in each GroupDocs is actually
    * an instance of TopDocsAndShards
    */
-  public static <T> TopGroups2<T> merge(TopGroups2<T>[] shardGroups, Sort groupSort, Sort docSort, int docOffset, int docTopN, ScoreMergeMode scoreMergeMode)
+  public static <T, T2> TopGroups2<T, T2> merge(TopGroups2<T, T2>[] shardGroups, Sort groupSort, Sort docSort, int docOffset, int docTopN, ScoreMergeMode scoreMergeMode)
     throws IOException {
 
     //System.out.println("TopGroups.merge");
@@ -78,7 +79,7 @@ public class TopGroups2<GROUP_VALUE_TYPE> extends TopGroups<GROUP_VALUE_TYPE>{
     Integer totalGroupCount = null;
 
     final int numGroups = shardGroups[0].groups.length;
-    for(TopGroups2<T> shard : shardGroups) {
+    for(TopGroups2<T, T2> shard : shardGroups) {
       if (numGroups != shard.groups.length) {
         throw new IllegalArgumentException("number of groups differs across shards; you must pass same top groups to all shards' second-pass collector");
       }
@@ -94,7 +95,7 @@ public class TopGroups2<GROUP_VALUE_TYPE> extends TopGroups<GROUP_VALUE_TYPE>{
     }
 
     @SuppressWarnings({"unchecked","rawtypes"})
-    final Group2Docs<T>[] mergedGroupDocs = new Group2Docs[numGroups];
+    final Group2Docs<T, T2>[] mergedGroupDocs = new Group2Docs[numGroups];
 
     final TopDocs[] shardTopDocs;
     if (docSort.equals(Sort.RELEVANCE)) {
@@ -105,16 +106,16 @@ public class TopGroups2<GROUP_VALUE_TYPE> extends TopGroups<GROUP_VALUE_TYPE>{
     float totalMaxScore = Float.MIN_VALUE;
 
     for(int groupIDX=0;groupIDX<numGroups;groupIDX++) {
-      final T parentGroupValue = ((Group2Docs<T>)shardGroups[0].groups[groupIDX]).groupParentValue;
-      final T groupValue = shardGroups[0].groups[groupIDX].groupValue;
+      final T parentGroupValue = ((Group2Docs<T, T2>)shardGroups[0].groups[groupIDX]).groupParentValue;
+      final T2 groupValue = shardGroups[0].groups[groupIDX].groupValue;
       //System.out.println("  merge groupValue=" + groupValue + " sortValues=" + Arrays.toString(shardGroups[0].groups[groupIDX].groupSortValues));
       float maxScore = Float.MIN_VALUE;
       int totalHits = 0;
       double scoreSum = 0.0;
       for(int shardIDX=0;shardIDX<shardGroups.length;shardIDX++) {
         //System.out.println("    shard=" + shardIDX);
-        final TopGroups2<T> shard = shardGroups[shardIDX];
-        final Group2Docs<?> shardGroupDocs = (Group2Docs<?>)shard.groups[groupIDX];
+        final TopGroups2<T, T2> shard = shardGroups[shardIDX];
+        final Group2Docs<?,?> shardGroupDocs = (Group2Docs<?,?>)shard.groups[groupIDX];
         if (groupValue == null) {
           if (shardGroupDocs.groupValue != null) {
             throw new IllegalArgumentException("group values differ across shards; you must pass same top groups to all shards' second-pass collector");
@@ -197,7 +198,7 @@ public class TopGroups2<GROUP_VALUE_TYPE> extends TopGroups<GROUP_VALUE_TYPE>{
     }
 
     if (totalGroupCount != null) {
-      TopGroups2<T> result = new TopGroups2<>(groupSort.getSort(),
+      TopGroups2<T, T2> result = new TopGroups2<>(groupSort.getSort(),
                               docSort.getSort(),
                               totalHitCount,
                               totalGroupedHitCount,

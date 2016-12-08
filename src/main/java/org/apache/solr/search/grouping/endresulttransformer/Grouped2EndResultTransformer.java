@@ -66,7 +66,7 @@ public class Grouped2EndResultTransformer implements EndResultTransformer {
     SchemaField schemaField = searcher.getSchema().getField(field);
     String subField = ((Grouping2Specification)rb.getGroupingSpec()).getSubField();
     SchemaField schemaSubField = searcher.getSchema().getField(subField);
-    TopGroups2<BytesRef> topGroups = (TopGroups2<BytesRef>)rb.mergedTopGroups.get(field+"."+subField);
+    TopGroups2<BytesRef, BytesRef> topGroups = (TopGroups2<BytesRef, BytesRef>)rb.mergedTopGroups.get(field+"."+subField);
     if (topGroups == null) {
     	rb.rsp.add("grouped", grouped);
     	NamedList<Object> rec = new SimpleOrderedMap<>();
@@ -81,7 +81,7 @@ public class Grouped2EndResultTransformer implements EndResultTransformer {
     	long totalCount = 0;
       List<NamedList> groupsList = new ArrayList<>();
     	for(SearchGroup<BytesRef> g : groups){
-    		CollectedSearchGroup2<BytesRef> group = (CollectedSearchGroup2<BytesRef>)g;
+    		CollectedSearchGroup2<BytesRef, BytesRef> group = (CollectedSearchGroup2<BytesRef, BytesRef>)g;
     		totalCount += group.groupCount;
         NamedList<Object> groupRec = new SimpleOrderedMap<>();
         Object groupVal = schemaField.getType().toObject(schemaField.createField(group.groupValue.utf8ToString(), 1.0f)); 
@@ -199,11 +199,11 @@ public class Grouped2EndResultTransformer implements EndResultTransformer {
 //    rb.rsp.add("grouped", grouped);
 //  }
 
-  private SolrDocumentList getDocList(ResponseBuilder rb, TopGroups2<BytesRef> topGroups, 
+  private SolrDocumentList getDocList(ResponseBuilder rb, TopGroups2<BytesRef, BytesRef> topGroups, 
   		  BytesRef groupValue, BytesRef subGroupValue, SolrDocumentSource solrDocumentSource){
     SolrDocumentList docList = new SolrDocumentList();
-    Group2Docs<BytesRef> group = null;
-    for(Group2Docs<BytesRef> g : topGroups.groups){
+    Group2Docs<BytesRef, BytesRef> group = null;
+    for(Group2Docs<BytesRef, BytesRef> g : topGroups.groups){
     	if(g.groupValue.bytesEquals(subGroupValue) && g.groupParentValue.bytesEquals(groupValue)){
     		group = g;
     		break;

@@ -38,6 +38,7 @@ import org.apache.lucene.search.grouping.term.TermThirdPassGrouping2Collector;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.mutable.MutableValue;
+import org.apache.solr.schema.SchemaField;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -216,11 +217,12 @@ public class Grouping2Search {
 
     AbstractSecondPassGrouping2Collector secondPassCollector;
     int topNInsideGroup = groupDocsOffset + groupDocsLimit;
+//    SchemaField sfGroup = searcher.getIndexReader().
     secondPassCollector = new TermSecondPassGrouping2Collector(groupField, parentGroupField, null, topSearchGroups, groupSort, topN);
     if (cachedCollector != null && cachedCollector.isCached()) {
-      cachedCollector.replay(secondPassCollector);
+//      cachedCollector.replay(secondPassCollector);
     } else {
-      searcher.search(query, secondPassCollector);
+//      searcher.search(query, secondPassCollector);
     }
 
     AbstractThirdPassGrouping2Collector thirdPassCollector;

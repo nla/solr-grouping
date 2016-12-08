@@ -275,7 +275,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
 
           Collection<SearchGroup<BytesRef>> topGroups = new ArrayList<>(topGroupsParam.length);
           for (String topGroup : topGroupsParam) {
-          	CollectedSearchGroup2<BytesRef> searchGroup = new CollectedSearchGroup2<>();
+          	CollectedSearchGroup2<BytesRef, BytesRef> searchGroup = new CollectedSearchGroup2<>();
           	if (!topGroup.equals(TopGroupsShardRequestFactory.GROUP_NULL_VALUE)) {
           		searchGroup.groupValue = new BytesRef(schemaField.getType().readableToIndexed(topGroup));
           		topGroups.add(searchGroup);
@@ -320,9 +320,9 @@ public class QueryComponentGrouping2 extends QueryComponent{
               topGroupsParam = new String[0];
             }
 
-            Collection<CollectedSearchGroup2<BytesRef>> topGroups = new ArrayList<>(topGroupsParam.length);
+            Collection<CollectedSearchGroup2<BytesRef, BytesRef>> topGroups = new ArrayList<>(topGroupsParam.length);
             for (String topGroup : topGroupsParam) {
-              CollectedSearchGroup2<BytesRef> searchGroup = new CollectedSearchGroup2<>();
+              CollectedSearchGroup2<BytesRef, BytesRef> searchGroup = new CollectedSearchGroup2<>();
               if (!topGroup.equals(TopGroupsShardRequestFactory.GROUP_NULL_VALUE)) {
                 searchGroup.groupValue = new BytesRef(schemaField.getType().readableToIndexed(topGroup));
                 String[] topSubGroupsParam = params.getParams(GroupParams.GROUP_DISTRIBUTED_TOPGROUPS_PREFIX + field
@@ -333,7 +333,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
                 searchGroup.subGroups = new ArrayList<>(topSubGroupsParam.length);
 
                 for (String subGroup : topSubGroupsParam) {
-                  CollectedSearchGroup2<BytesRef> sg = new CollectedSearchGroup2<>();
+                  CollectedSearchGroup2<BytesRef, BytesRef> sg = new CollectedSearchGroup2<>();
                   sg.groupValue = new BytesRef(schemaSubField.getType().readableToIndexed(subGroup));
                   searchGroup.subGroups.add(sg);
                 }
@@ -379,13 +379,13 @@ public class QueryComponentGrouping2 extends QueryComponent{
 
             Collection<SearchGroup<BytesRef>> topGroups = new ArrayList<>(topGroupsParam.length);
             for (String topGroup : topGroupsParam) {
-              CollectedSearchGroup2<BytesRef> searchGroup = new CollectedSearchGroup2<>();
+              CollectedSearchGroup2<BytesRef, BytesRef> searchGroup = new CollectedSearchGroup2<>();
               if (!topGroup.equals(TopGroupsShardRequestFactory.GROUP_NULL_VALUE)) {
                 searchGroup.groupValue = new BytesRef(schemaField.getType().readableToIndexed(topGroup));
                 String[] innerGroupsParam = params.getParams(GroupParams.GROUP_DISTRIBUTED_TOPGROUPS_PREFIX + field+"."+topGroup);
                 Collection<SearchGroup<BytesRef>> innerSearchGroup = new ArrayList<>();
                 for (String innerGroup : innerGroupsParam) {
-                  CollectedSearchGroup2<BytesRef> inner = new CollectedSearchGroup2<>();
+                  CollectedSearchGroup2<BytesRef, BytesRef> inner = new CollectedSearchGroup2<>();
                   inner.groupValue = new BytesRef(innerSchemaField.getType().readableToIndexed(innerGroup));
                   innerSearchGroup.add(inner);
                 }
@@ -450,7 +450,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
 
         if (groupingSpec.getFunctions() != null) {
           for (String groupByStr : groupingSpec.getFunctions()) {
-            grouping.addFunctionCommand(groupByStr, rb.req);
+            grouping.addFunctionCommand(groupByStr,groupingSpec.getSubField(), rb.req);
           }
         }
 

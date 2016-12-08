@@ -118,7 +118,7 @@ public class SearchGroup2SecondPhaseShardResponseProcessor implements ShardRespo
         maxElapsedTime = (int) Math.max(maxElapsedTime, srsp.getSolrResponse().getElapsedTime());
         @SuppressWarnings("unchecked")
         NamedList<NamedList> secondPhaseResult = (NamedList<NamedList>) srsp.getSolrResponse().getResponse().get("secondPhase");
-        final Map<String, CollectedSearchGroup2<BytesRef>> result = serializer.transformToNative(secondPhaseResult, groupSort, sortWithinGroup, srsp.getShard());
+        final Map<String, CollectedSearchGroup2<BytesRef, BytesRef>> result = serializer.transformToNative(secondPhaseResult, groupSort, sortWithinGroup, srsp.getShard());
 //        for (String field : result.keySet()) {
 //          final CollectedSearchGroup2<BytesRef> firstPhaseGroup = result.get(field);
 //
@@ -145,7 +145,7 @@ public class SearchGroup2SecondPhaseShardResponseProcessor implements ShardRespo
 //      rb.totalHitCount = hitCountDuringFirstPhase;
         rb.firstPhaseElapsedTime = maxElapsedTime;
         for (String groupField : result.keySet()) {
-        	CollectedSearchGroup2<BytesRef> parent = result.get(groupField);
+        	CollectedSearchGroup2<BytesRef, BytesRef> parent = result.get(groupField);
         	Collection<SearchGroup<BytesRef>> topGroups = parent.subGroups;
         	List<Collection<SearchGroup<BytesRef>>> group = all.get(groupField);
         	if(group == null){
@@ -169,11 +169,11 @@ public class SearchGroup2SecondPhaseShardResponseProcessor implements ShardRespo
       		SearchGroup<BytesRef> g = i.next();
       		if(g.groupValue.bytesEquals(groupKey)){
       			if(g instanceof CollectedSearchGroup2){
-      				((CollectedSearchGroup2<BytesRef>)g).subGroups = mergedTopGroups;
-      				((CollectedSearchGroup2<BytesRef>)g).groupCount = groupCount.get(e.getKey());
+      				((CollectedSearchGroup2<BytesRef, BytesRef>)g).subGroups = mergedTopGroups;
+      				((CollectedSearchGroup2<BytesRef, BytesRef>)g).groupCount = groupCount.get(e.getKey());
       			}
       			else{
-      				CollectedSearchGroup2<BytesRef> newGroup = new CollectedSearchGroup2<>(g);
+      				CollectedSearchGroup2<BytesRef, BytesRef> newGroup = new CollectedSearchGroup2<>(g);
       				newGroup.subGroups = mergedTopGroups;
       				newGroup.groupCount = groupCount.get(e.getKey());
       				i.remove();

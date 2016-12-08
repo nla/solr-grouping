@@ -151,7 +151,7 @@ if(1==1) // for second level we need to check all shards
         }
         sreq.params.add(GroupParams.GROUP_DISTRIBUTED_TOPGROUPS_PREFIX + entry.getKey(), groupValue);
         if(phaseThree){
-        	CollectedSearchGroup2<BytesRef> collectedSearchGroup = (CollectedSearchGroup2<BytesRef>)searchGroup;
+        	CollectedSearchGroup2<BytesRef, BytesRef> collectedSearchGroup = (CollectedSearchGroup2<BytesRef, BytesRef>)searchGroup;
         	for(SearchGroup<BytesRef> sg : collectedSearchGroup.subGroups){
         		String subGroupValue;
             if (sg.groupValue != null) {

@@ -38,7 +38,7 @@ import org.apache.lucene.util.SentinelIntSet;
  *
  * @lucene.experimental
  */
-public class TermThirdPassGrouping2Collector extends AbstractThirdPassGrouping2Collector<BytesRef> {
+public class TermThirdPassGrouping2Collector extends AbstractThirdPassGrouping2Collector<BytesRef, BytesRef> {
 
   private final String groupParentField;
   private final String groupField;
@@ -48,7 +48,7 @@ public class TermThirdPassGrouping2Collector extends AbstractThirdPassGrouping2C
   private SortedDocValues indexParent;
 
   @SuppressWarnings({"unchecked", "rawtypes"})
-  public TermThirdPassGrouping2Collector(String groupField, String groupParentField, Collection<CollectedSearchGroup2<BytesRef>> groups, 
+  public TermThirdPassGrouping2Collector(String groupField, String groupParentField, Collection<CollectedSearchGroup2<BytesRef, BytesRef>> groups, 
   		                                   Sort groupSort, Sort withinGroupSort,
                                          int maxDocsPerGroup, boolean getScores, boolean getMaxScores, boolean fillSortFields)
       throws IOException {

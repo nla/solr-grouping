@@ -21,14 +21,18 @@ import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.grouping.AbstractSecondPassGrouping2Collector;
 import org.apache.lucene.search.grouping.CollectedSearchGroup2;
 import org.apache.lucene.search.grouping.SearchGroup;
+import org.apache.lucene.search.grouping.term.FunctionSecondPassGrouping2Collector;
+import org.apache.lucene.search.grouping.term.TermSecondPassGrouping2Collector;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.CharsRef;
 import org.apache.lucene.util.UnicodeUtil;
+import org.apache.lucene.util.mutable.MutableValue;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.schema.FieldType;
 import org.apache.solr.schema.SchemaField;
 import org.apache.solr.search.SolrIndexSearcher;
 import org.apache.solr.search.grouping.Command;
+import org.apache.solr.search.grouping.distributed.command.Group2Converter;
 import org.apache.solr.search.grouping.distributed.command.SearchGroups2FieldCommand;
 import org.apache.solr.search.grouping.distributed.command.SearchGroupsFieldCommandResult;
 
@@ -38,7 +42,7 @@ import java.util.*;
 /**
  * Implementation for transforming {@link SearchGroup} into a {@link NamedList} structure and visa versa.
  */
-public class SearchGroups2ResultTransformer implements ShardResultTransformer<List<Command>, Map<String, CollectedSearchGroup2<BytesRef>>> {
+public class SearchGroups2ResultTransformer implements ShardResultTransformer<List<Command>, Map<String, CollectedSearchGroup2<BytesRef, BytesRef>>> {
 
   protected static final String TOP_GROUPS = "topGroups";
   protected static final String GROUP_COUNT = "groupCount";
@@ -64,7 +68,7 @@ public class SearchGroups2ResultTransformer implements ShardResultTransformer<Li
         final SearchGroupsFieldCommandResult fieldCommandResult = fieldCommand.result();
         key = fieldCommand.getParentKey();
         final Collection<SearchGroup<BytesRef>> searchGroups = fieldCommandResult.getSearchGroups();
-        AbstractSecondPassGrouping2Collector<BytesRef> collector = fieldCommand.getSecondPassGroupingCollector();
+        AbstractSecondPassGrouping2Collector<BytesRef, BytesRef> collector = fieldCommand.getSecondPassGroupingCollector();
         if (searchGroups != null) {
           result.add(TOP_GROUPS, serializeSearchGroup(collector, fieldCommand.getGroupSort()));
         }
@@ -81,12 +85,12 @@ public class SearchGroups2ResultTransformer implements ShardResultTransformer<Li
    * {@inheritDoc}
    */
   @Override
-  public Map<String, CollectedSearchGroup2<BytesRef>> transformToNative(NamedList<NamedList> shardResponse, Sort groupSort, Sort sortWithinGroup, String shard) {
+  public Map<String, CollectedSearchGroup2<BytesRef, BytesRef>> transformToNative(NamedList<NamedList> shardResponse, Sort groupSort, Sort sortWithinGroup, String shard) {
   	int shardSize = 0;
   	if(shardResponse != null){
   		shardSize = shardResponse.size();
   	}
-    final Map<String, CollectedSearchGroup2<BytesRef>> result = new HashMap<>(shardSize);
+    final Map<String, CollectedSearchGroup2<BytesRef, BytesRef>> result = new HashMap<>(shardSize);
     if(shardResponse == null){
     	return result;
     }
@@ -94,7 +98,7 @@ public class SearchGroups2ResultTransformer implements ShardResultTransformer<Li
       NamedList<NamedList> topGroupsAndGroupCount = command.getValue();
       for(Map.Entry<String, NamedList> e : topGroupsAndGroupCount){
       	final String key = e.getKey();
-      	CollectedSearchGroup2<BytesRef> collectedGroup = new CollectedSearchGroup2<>();
+      	CollectedSearchGroup2<BytesRef, BytesRef> collectedGroup = new CollectedSearchGroup2<>();
       	collectedGroup.groupValue = new BytesRef(key);
       	final Long count = (Long)e.getValue().get(GROUP_COUNT);
       	if(count != null){
@@ -104,7 +108,7 @@ public class SearchGroups2ResultTransformer implements ShardResultTransformer<Li
         final NamedList<List<Comparable>> rawSearchGroups = (NamedList<List<Comparable>>) e.getValue().get(GROUPS);
         if (rawSearchGroups != null) {
           for (Map.Entry<String, List<Comparable>> rawSearchGroup : rawSearchGroups){
-	          CollectedSearchGroup2<BytesRef> searchGroup = new CollectedSearchGroup2<>();
+	          CollectedSearchGroup2<BytesRef, BytesRef> searchGroup = new CollectedSearchGroup2<>();
 	          searchGroup.groupValue = rawSearchGroup.getKey() != null ? new BytesRef(rawSearchGroup.getKey()) : null;
 	          searchGroup.sortValues = rawSearchGroup.getValue().toArray(new Comparable[rawSearchGroup.getValue().size()]);
 	          for (int i = 0; i < searchGroup.sortValues.length; i++) {
@@ -128,15 +132,21 @@ public class SearchGroups2ResultTransformer implements ShardResultTransformer<Li
     return result;
   }
 
-  private NamedList serializeSearchGroup(AbstractSecondPassGrouping2Collector<BytesRef> collector, Sort groupSort) {
+  private NamedList serializeSearchGroup(AbstractSecondPassGrouping2Collector<?, ?> collector, Sort groupSort) {
     final NamedList<Object> result = new NamedList<>();
-
-    for (SearchGroup<BytesRef> searchGroup : collector.getTopGroupsFirstPass()) {
+    Collection<CollectedSearchGroup2<BytesRef, BytesRef>> topGroupsFirstPass = null;
+    if(collector instanceof TermSecondPassGrouping2Collector){
+    	topGroupsFirstPass = ((TermSecondPassGrouping2Collector)collector).getTopGroupsNested(0, true);
+    }
+    else{
+  xxx get working with G2  	topGroupsFirstPass = Group2Converter.fromMutable(((FunctionSecondPassGrouping2Collector)collector).getGroupParentSchemaField(),
+    			((FunctionSecondPassGrouping2Collector)collector).getTopGroupsNested(0, true));
+    }
+    for (CollectedSearchGroup2<BytesRef, BytesRef> searchGroup : topGroupsFirstPass) {
     	// for each group found in the first pass get their values from the second pass
-    	AbstractSecondPassGrouping2Collector<BytesRef> leafCollector = collector.getCollectors(searchGroup.groupValue);
     	NamedList<Object> groupResult = new NamedList<>();
     	NamedList<Object[]> groupRecord = new NamedList<>();
-    	for(SearchGroup<BytesRef> rec : leafCollector.getTopGroups(0, true)){
+    	for(SearchGroup<BytesRef> rec : searchGroup.subGroups){
     		Object[] convertedSortValues = new Object[rec.sortValues.length];
 	      for (int i = 0; i < rec.sortValues.length; i++) {
 	        Object sortValue = rec.sortValues[i];
@@ -153,7 +163,7 @@ public class SearchGroups2ResultTransformer implements ShardResultTransformer<Li
 	      groupRecord.add(groupValue, convertedSortValues);
     	}
       String groupValue = searchGroup.groupValue != null ? searchGroup.groupValue.utf8ToString() : null;
-      groupResult.add(GROUP_COUNT, leafCollector.getTotalHitCount());
+      groupResult.add(GROUP_COUNT, searchGroup.groupCount);
       groupResult.add(GROUPS, groupRecord);
       result.add(groupValue, groupResult);
     }

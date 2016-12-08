@@ -126,7 +126,7 @@ public class TopGroups2ResultTransformer implements ShardResultTransformer<List<
 
       Long totalHitCount = (Long) commandResult.get("totalHitCount");
 
-      List<Group2Docs<BytesRef>> groupDocs = new ArrayList<>();
+      List<Group2Docs<BytesRef, BytesRef>> groupDocs = new ArrayList<>();
       for (int i = 2; i < commandResult.size(); i++) {// go through all level 1 groups
         String parentGroupValue = commandResult.getName(i);
         @SuppressWarnings("unchecked")
@@ -151,8 +151,8 @@ public class TopGroups2ResultTransformer implements ShardResultTransformer<List<
         }
       }
       @SuppressWarnings("unchecked")
-      Group2Docs<BytesRef>[] groupDocsArr = groupDocs.toArray(new Group2Docs[groupDocs.size()]);
-      TopGroups2<BytesRef> topGroups = new TopGroups2<>(
+      Group2Docs<BytesRef, BytesRef>[] groupDocsArr = groupDocs.toArray(new Group2Docs[groupDocs.size()]);
+      TopGroups2<BytesRef, BytesRef> topGroups = new TopGroups2<>(
       		groupSort.getSort(), sortWithinGroup.getSort(), totalHitCount, totalGroupedHitCount, groupDocsArr, Float.NaN
       		);
         
@@ -201,7 +201,7 @@ public class TopGroups2ResultTransformer implements ShardResultTransformer<List<
 
   protected NamedList serializeTopGroups(TopGroups<BytesRef> d, SchemaField groupField) throws IOException {
     NamedList<Object> result = new NamedList<>();
-    TopGroups2<BytesRef> data = (TopGroups2<BytesRef>)d;
+    TopGroups2<BytesRef, BytesRef> data = (TopGroups2<BytesRef, BytesRef>)d;
     result.add("totalGroupedHitCount", data.totalGroupedHitCount);
     result.add("totalHitCount", data.totalHitCount);
     if (data.totalGroupCount != null) {
@@ -210,7 +210,7 @@ public class TopGroups2ResultTransformer implements ShardResultTransformer<List<
 
     final IndexSchema schema = rb.req.getSearcher().getSchema();
     SchemaField uniqueField = schema.getUniqueKeyField();
-    for (Group2Docs<BytesRef> searchGroup : (Group2Docs<BytesRef>[])data.groups) {
+    for (Group2Docs<BytesRef, BytesRef> searchGroup : (Group2Docs<BytesRef, BytesRef>[])data.groups) {
       String groupValue = searchGroup.groupValue != null ? groupField.getType().indexedToReadable(searchGroup.groupValue.utf8ToString()): null;
       String groupParentValue = searchGroup.groupValue != null ? groupField.getType().indexedToReadable(searchGroup.groupParentValue.utf8ToString()): null;
       NamedList<NamedList<Object>> groupParentResult = (NamedList<NamedList<Object>>)result.get(groupParentValue);
