@@ -21,7 +21,7 @@ import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.grouping.AbstractSecondPassGrouping2Collector;
 import org.apache.lucene.search.grouping.CollectedSearchGroup2;
 import org.apache.lucene.search.grouping.SearchGroup;
-import org.apache.lucene.search.grouping.term.FunctionSecondPassGrouping2Collector;
+import org.apache.lucene.search.grouping.function.FunctionSecondPassGrouping2Collector;
 import org.apache.lucene.search.grouping.term.TermSecondPassGrouping2Collector;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.CharsRef;
@@ -67,10 +67,10 @@ public class SearchGroups2ResultTransformer implements ShardResultTransformer<Li
         SearchGroups2FieldCommand fieldCommand = (SearchGroups2FieldCommand) command;
         final SearchGroupsFieldCommandResult fieldCommandResult = fieldCommand.result();
         key = fieldCommand.getParentKey();
-        final Collection<SearchGroup<BytesRef>> searchGroups = fieldCommandResult.getSearchGroups();
-        AbstractSecondPassGrouping2Collector<BytesRef, BytesRef> collector = fieldCommand.getSecondPassGroupingCollector();
+        final Collection<CollectedSearchGroup2<BytesRef, BytesRef>> searchGroups = 
+        		(Collection)fieldCommandResult.getSearchGroups();
         if (searchGroups != null) {
-          result.add(TOP_GROUPS, serializeSearchGroup(collector, fieldCommand.getGroupSort()));
+          result.add(TOP_GROUPS, serializeSearchGroup(searchGroups, fieldCommand.getGroupSort()));
         }
       } else {
         continue;
@@ -132,16 +132,8 @@ public class SearchGroups2ResultTransformer implements ShardResultTransformer<Li
     return result;
   }
 
-  private NamedList serializeSearchGroup(AbstractSecondPassGrouping2Collector<?, ?> collector, Sort groupSort) {
+  private NamedList serializeSearchGroup(Collection<CollectedSearchGroup2<BytesRef, BytesRef>> topGroupsFirstPass, Sort groupSort) {
     final NamedList<Object> result = new NamedList<>();
-    Collection<CollectedSearchGroup2<BytesRef, BytesRef>> topGroupsFirstPass = null;
-    if(collector instanceof TermSecondPassGrouping2Collector){
-    	topGroupsFirstPass = ((TermSecondPassGrouping2Collector)collector).getTopGroupsNested(0, true);
-    }
-    else{
-  xxx get working with G2  	topGroupsFirstPass = Group2Converter.fromMutable(((FunctionSecondPassGrouping2Collector)collector).getGroupParentSchemaField(),
-    			((FunctionSecondPassGrouping2Collector)collector).getTopGroupsNested(0, true));
-    }
     for (CollectedSearchGroup2<BytesRef, BytesRef> searchGroup : topGroupsFirstPass) {
     	// for each group found in the first pass get their values from the second pass
     	NamedList<Object> groupResult = new NamedList<>();

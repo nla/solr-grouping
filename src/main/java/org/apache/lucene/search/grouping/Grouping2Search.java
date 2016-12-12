@@ -1,5 +1,12 @@
 package org.apache.lucene.search.grouping;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -26,26 +33,14 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.SortField;
 import org.apache.lucene.search.Weight;
-import org.apache.lucene.search.grouping.function.FunctionAllGroupHeadsCollector;
-import org.apache.lucene.search.grouping.function.FunctionAllGroupsCollector;
-import org.apache.lucene.search.grouping.function.FunctionFirstPassGroupingCollector;
-import org.apache.lucene.search.grouping.function.FunctionSecondPassGroupingCollector;
 import org.apache.lucene.search.grouping.term.TermAllGroupHeadsCollector;
 import org.apache.lucene.search.grouping.term.TermAllGroupsCollector;
-import org.apache.lucene.search.grouping.term.TermFirstPassGroupingCollector;
+import org.apache.lucene.search.grouping.term.TermFirstPassGrouping2Collector;
 import org.apache.lucene.search.grouping.term.TermSecondPassGrouping2Collector;
 import org.apache.lucene.search.grouping.term.TermThirdPassGrouping2Collector;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.mutable.MutableValue;
-import org.apache.solr.schema.SchemaField;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 
 /**
  * Convenience class to perform grouping in a non distributed environment.
@@ -142,7 +137,7 @@ public class Grouping2Search {
   @SuppressWarnings({"unchecked", "rawtypes"})
   protected TopGroups groupByFieldOrFunction(IndexSearcher searcher, Query query, int groupOffset, int groupLimit) throws IOException {
     int topN = groupOffset + groupLimit;
-    final AbstractFirstPassGroupingCollector firstPassCollector;
+    final AbstractFirstPassGrouping2Collector firstPassCollector;
     final AbstractAllGroupsCollector allGroupsCollector;
     final AbstractAllGroupHeadsCollector allGroupHeadsCollector;
     if (groupFunction != null) {
@@ -159,7 +154,7 @@ public class Grouping2Search {
 //        allGroupHeadsCollector = null;
 //      }
     } else {
-      firstPassCollector = new TermFirstPassGroupingCollector(groupField, groupSort, topN);
+      firstPassCollector = new TermFirstPassGrouping2Collector(groupField, groupSort, topN);
       if (allGroups) {
         allGroupsCollector = new TermAllGroupsCollector(groupField, initialSize);
       } else {

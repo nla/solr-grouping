@@ -84,7 +84,7 @@ public class Grouped2EndResultTransformer implements EndResultTransformer {
     		CollectedSearchGroup2<BytesRef, BytesRef> group = (CollectedSearchGroup2<BytesRef, BytesRef>)g;
     		totalCount += group.groupCount;
         NamedList<Object> groupRec = new SimpleOrderedMap<>();
-        Object groupVal = schemaField.getType().toObject(schemaField.createField(group.groupValue.utf8ToString(), 1.0f)); 
+        Object groupVal = schemaField.getType().toObject(schemaField.createField(schemaField.getType().indexedToReadable(group.groupValue.utf8ToString()), 1.0f)); 
         groupRec.add("groupValue", groupVal);
         NamedList<Object> subGroupContainer = new SimpleOrderedMap<>();
         NamedList<Object> subGroupRec = new SimpleOrderedMap<>();
@@ -95,7 +95,7 @@ public class Grouped2EndResultTransformer implements EndResultTransformer {
     		for(SearchGroup<BytesRef> subGroup : group.subGroups){
           NamedList<Object> docRec = new SimpleOrderedMap<>();
 //      		CollectedSearchGroup2<BytesRef> subGroup = (CollectedSearchGroup2<BytesRef>)sg;
-          Object subGroupVal = schemaSubField.getType().toObject(schemaSubField.createField(subGroup.groupValue.utf8ToString(), 1.0f));
+          Object subGroupVal = schemaSubField.getType().toObject(schemaSubField.createField(schemaSubField.getType().indexedToReadable(subGroup.groupValue.utf8ToString()), 1.0f));
           docRec.add("groupValue", subGroupVal);
           docRec.add("docList", getDocList(rb, topGroups, group.groupValue, subGroup.groupValue, solrDocumentSource));
           subGroupsList.add(docRec);

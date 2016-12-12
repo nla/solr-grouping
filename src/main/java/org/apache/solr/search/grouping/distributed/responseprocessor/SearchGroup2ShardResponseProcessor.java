@@ -141,10 +141,10 @@ public class SearchGroup2ShardResponseProcessor implements ShardResponseProcesso
       for (String groupField : commandSearchGroups.keySet()) {
         List<Collection<SearchGroup<BytesRef>>> topGroups = commandSearchGroups.get(groupField);
         Collection<SearchGroup<BytesRef>> mergedTopGroups = SearchGroup.merge(topGroups, ss.getOffset(), ss.getCount(), groupSort);
+
         if (mergedTopGroups == null) {
           continue;
         }
-
         rb.mergedSearchGroups.put(groupField, mergedTopGroups);
         for (SearchGroup<BytesRef> mergedTopGroup : mergedTopGroups) {
           rb.searchGroupToShards.get(groupField).put(mergedTopGroup, tempSearchGroupToShards.get(groupField).get(mergedTopGroup));

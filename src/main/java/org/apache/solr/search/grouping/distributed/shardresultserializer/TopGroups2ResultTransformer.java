@@ -76,7 +76,8 @@ public class TopGroups2ResultTransformer implements ShardResultTransformer<List<
       if (TopGroups2FieldCommand.class.isInstance(command)) {
         TopGroups2FieldCommand fieldCommand = (TopGroups2FieldCommand) command;
         SchemaField groupField = schema.getField(fieldCommand.getKey());
-        commandResult = serializeTopGroups(fieldCommand.result(), groupField);
+        SchemaField groupParentField = schema.getField(fieldCommand.getParentKey());
+        commandResult = serializeTopGroups(fieldCommand.result(), groupParentField, groupField);
         key = fieldCommand.getParentKey() + "." + command.getKey();
       } else if (QueryCommand.class.isInstance(command)) {
         QueryCommand queryCommand = (QueryCommand) command;
@@ -199,7 +200,7 @@ public class TopGroups2ResultTransformer implements ShardResultTransformer<List<
     return scoreDocs;
   }
 
-  protected NamedList serializeTopGroups(TopGroups<BytesRef> d, SchemaField groupField) throws IOException {
+  protected NamedList serializeTopGroups(TopGroups<BytesRef> d, SchemaField groupParentField, SchemaField groupField) throws IOException {
     NamedList<Object> result = new NamedList<>();
     TopGroups2<BytesRef, BytesRef> data = (TopGroups2<BytesRef, BytesRef>)d;
     result.add("totalGroupedHitCount", data.totalGroupedHitCount);
@@ -211,8 +212,10 @@ public class TopGroups2ResultTransformer implements ShardResultTransformer<List<
     final IndexSchema schema = rb.req.getSearcher().getSchema();
     SchemaField uniqueField = schema.getUniqueKeyField();
     for (Group2Docs<BytesRef, BytesRef> searchGroup : (Group2Docs<BytesRef, BytesRef>[])data.groups) {
-      String groupValue = searchGroup.groupValue != null ? groupField.getType().indexedToReadable(searchGroup.groupValue.utf8ToString()): null;
-      String groupParentValue = searchGroup.groupValue != null ? groupField.getType().indexedToReadable(searchGroup.groupParentValue.utf8ToString()): null;
+//      String groupValue = searchGroup.groupValue != null ? groupField.getType().indexedToReadable(searchGroup.groupValue.utf8ToString()): null;
+//      String groupParentValue = searchGroup.groupValue != null ? groupParentField.getType().indexedToReadable(searchGroup.groupParentValue.utf8ToString()): null;
+      String groupValue = searchGroup.groupValue != null ? searchGroup.groupValue.utf8ToString(): null;
+      String groupParentValue = searchGroup.groupValue != null ? searchGroup.groupParentValue.utf8ToString(): null;
       NamedList<NamedList<Object>> groupParentResult = (NamedList<NamedList<Object>>)result.get(groupParentValue);
       if(groupParentResult == null){
       	groupParentResult = new NamedList<>();

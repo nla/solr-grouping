@@ -1,4 +1,4 @@
-package org.apache.lucene.search.grouping.term;
+package org.apache.lucene.search.grouping.function;
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
@@ -50,7 +50,6 @@ public class FunctionSecondPassGrouping2Collector extends AbstractSecondPassGrou
 
   private SortedDocValues index;
   private SortedDocValues indexParent;
-
   private String groupField;
   private SchemaField groupSchemaField;
   private String groupParentField;
@@ -141,16 +140,12 @@ public class FunctionSecondPassGrouping2Collector extends AbstractSecondPassGrou
   @Override
   protected void doSetNextReader(LeafReaderContext readerContext) throws IOException {
     super.doSetNextReader(readerContext);
-//    index = DocValues.getSorted(readerContext.reader(), groupField);
-//    indexParent = DocValues.getSorted(readerContext.reader(), groupParentField);
-    
     FunctionValues values = groupByVS.getValues(vsContext, readerContext);
     filler = values.getValueFiller();
     mval = filler.getValue();
     values = parentGroupByVS.getValues(parentVsContext, readerContext);
     parentFiller = values.getValueFiller();
     parentMVal = parentFiller.getValue();
-
   }
   
   public SchemaField getGroupParentSchemaField(){

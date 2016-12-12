@@ -27,6 +27,7 @@ import org.apache.lucene.search.grouping.GroupDocs;
 import org.apache.lucene.search.grouping.SearchGroup;
 import org.apache.lucene.search.grouping.TopGroups;
 import org.apache.lucene.search.grouping.function.FunctionSecondPassGroupingCollector;
+import org.apache.lucene.search.grouping.function.FunctionThirdPassGrouping2Collector;
 import org.apache.lucene.search.grouping.term.TermSecondPassGroupingCollector;
 import org.apache.lucene.search.grouping.term.TermThirdPassGrouping2Collector;
 import org.apache.lucene.util.BytesRef;
@@ -145,12 +146,12 @@ public class TopGroups2FieldCommand implements Command<TopGroups<BytesRef>> {
     final List<Collector> collectors = new ArrayList<>(1);
     final FieldType fieldType = field.getType();
     if (fieldType.getNumericType() != null) {
-    	throw new IllegalStateException("Not collector not supported");
-//      ValueSource vs = fieldType.getValueSource(field, null);
-//      Collection<SearchGroup<MutableValue>> v = GroupConverter.toMutable(field, firstPhaseGroups);
-//      secondPassCollector = new FunctionSecondPassGroupingCollector(
-//          v, groupSort, sortWithinGroup, maxDocPerGroup, needScores, needMaxScore, true, vs, new HashMap<Object,Object>()
-//      );
+      ValueSource vs = fieldType.getValueSource(field, null);
+      Collection<CollectedSearchGroup2<MutableValue, MutableValue>> v = 
+      		Group2Converter.toMutable(parentField, field, firstPhaseGroups);
+      thirdPassCollector = new FunctionThirdPassGrouping2Collector(field, parentField,
+          v, groupSort, sortWithinGroup, maxDocPerGroup, needScores, needMaxScore, true
+      );
     } else {
       thirdPassCollector = new TermThirdPassGrouping2Collector(
       		field.getName(), parentField.getName(), firstPhaseGroups, groupSort, sortWithinGroup, maxDocPerGroup, needScores, needMaxScore, true
@@ -169,7 +170,7 @@ public class TopGroups2FieldCommand implements Command<TopGroups<BytesRef>> {
 
     FieldType fieldType = field.getType();
     if (fieldType.getNumericType() != null) {
-      return GroupConverter.fromMutable(field, thirdPassCollector.getTopGroups(0));
+      return Group2Converter.fromMutable(parentField, field, thirdPassCollector.getTopGroups(0));
     } else {
       return thirdPassCollector.getTopGroups(0);
     }

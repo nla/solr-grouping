@@ -28,8 +28,8 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.lang.ArrayUtils;
-import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.index.ExitableDirectoryReader;
+import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.queries.function.FunctionQuery;
 import org.apache.lucene.queries.function.ValueSource;
 import org.apache.lucene.queries.function.valuesource.QueryValueSource;
@@ -48,23 +48,19 @@ import org.apache.lucene.search.TopFieldCollector;
 import org.apache.lucene.search.TopScoreDocCollector;
 import org.apache.lucene.search.TotalHitCountCollector;
 import org.apache.lucene.search.grouping.AbstractAllGroupHeadsCollector;
-import org.apache.lucene.search.grouping.CollectedSearchGroup;
 import org.apache.lucene.search.grouping.CollectedSearchGroup2;
 import org.apache.lucene.search.grouping.Group2Docs;
 import org.apache.lucene.search.grouping.GroupDocs;
 import org.apache.lucene.search.grouping.SearchGroup;
-import org.apache.lucene.search.grouping.TopGroups;
 import org.apache.lucene.search.grouping.TopGroups2;
 import org.apache.lucene.search.grouping.function.FunctionAllGroupHeadsCollector;
 import org.apache.lucene.search.grouping.function.FunctionAllGroupsCollector;
 import org.apache.lucene.search.grouping.function.FunctionFirstPassGroupingCollector;
-import org.apache.lucene.search.grouping.function.FunctionSecondPassGroupingCollector;
-import org.apache.lucene.search.grouping.term.FunctionSecondPassGrouping2Collector;
+import org.apache.lucene.search.grouping.function.FunctionSecondPassGrouping2Collector;
 import org.apache.lucene.search.grouping.term.TermAllGroupHeadsCollector;
 import org.apache.lucene.search.grouping.term.TermAllGroupsCollector;
-import org.apache.lucene.search.grouping.term.TermFirstPassGroupingCollector;
+import org.apache.lucene.search.grouping.term.TermFirstPassGrouping2Collector;
 import org.apache.lucene.search.grouping.term.TermSecondPassGrouping2Collector;
-import org.apache.lucene.search.grouping.term.TermSecondPassGroupingCollector;
 import org.apache.lucene.search.grouping.term.TermThirdPassGrouping2Collector;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.mutable.MutableValue;
@@ -754,7 +750,7 @@ public class Grouping2 {
 
     public SchemaField groupBy;
     public SchemaField parentGroupBy;
-    TermFirstPassGroupingCollector firstPass;
+    TermFirstPassGrouping2Collector firstPass;
     TermSecondPassGrouping2Collector secondPass;
     TermThirdPassGrouping2Collector thirdPass;
 
@@ -784,7 +780,7 @@ public class Grouping2 {
       }
 
       groupSort = groupSort == null ? Sort.RELEVANCE : groupSort;
-      firstPass = new TermFirstPassGroupingCollector(parentGroupBy.getName(), groupSort, actualGroupsToFind);
+      firstPass = new TermFirstPassGrouping2Collector(parentGroupBy.getName(), groupSort, actualGroupsToFind);
       return firstPass;
     }
 
@@ -1072,7 +1068,7 @@ public class Grouping2 {
 //          return fallBackCollector;
 //        }
 //      }
-      topGroups = Group2Converter.fromMutable(parentGroupBy, firstPass.getTopGroups(offset, false));
+      topGroups = Group2Converter.fromMutable(parentGroupBy, null, (Collection)firstPass.getTopGroups(offset, false));
 
       int groupdDocsToCollect = getMax(groupOffset, docsPerGroup, maxDoc);
       groupdDocsToCollect = Math.max(groupdDocsToCollect, 1);

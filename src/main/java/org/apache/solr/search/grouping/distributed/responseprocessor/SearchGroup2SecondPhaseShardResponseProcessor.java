@@ -167,7 +167,7 @@ public class SearchGroup2SecondPhaseShardResponseProcessor implements ShardRespo
       	Iterator<SearchGroup<BytesRef>> i = rb.mergedSearchGroups.get(field).iterator();
       	while(i.hasNext()){
       		SearchGroup<BytesRef> g = i.next();
-      		if(g.groupValue.bytesEquals(groupKey)){
+      		if(g.groupValue != null && groupKey.bytesEquals(g.groupValue)){
       			if(g instanceof CollectedSearchGroup2){
       				((CollectedSearchGroup2<BytesRef, BytesRef>)g).subGroups = mergedTopGroups;
       				((CollectedSearchGroup2<BytesRef, BytesRef>)g).groupCount = groupCount.get(e.getKey());

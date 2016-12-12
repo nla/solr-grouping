@@ -44,12 +44,10 @@ import org.apache.solr.search.SortSpecParsing;
 import org.apache.solr.search.SyntaxError;
 import org.apache.solr.search.grouping.CommandHandler;
 import org.apache.solr.search.grouping.Grouping2Specification;
-import org.apache.solr.search.grouping.GroupingSpecification;
 import org.apache.solr.search.grouping.distributed.ShardRequestFactory;
 import org.apache.solr.search.grouping.distributed.ShardResponseProcessor;
 import org.apache.solr.search.grouping.distributed.command.QueryCommand.Builder;
 import org.apache.solr.search.grouping.distributed.command.SearchGroups2FieldCommand;
-import org.apache.solr.search.grouping.distributed.command.SearchGroupsFieldCommand;
 import org.apache.solr.search.grouping.distributed.command.TopGroups2FieldCommand;
 import org.apache.solr.search.grouping.distributed.command.TopGroupsFieldCommand;
 import org.apache.solr.search.grouping.distributed.requestfactory.SearchGroupsRequestFactory;
@@ -60,8 +58,8 @@ import org.apache.solr.search.grouping.distributed.responseprocessor.SearchGroup
 import org.apache.solr.search.grouping.distributed.responseprocessor.SearchGroup2ShardResponseProcessor;
 import org.apache.solr.search.grouping.distributed.responseprocessor.StoredFieldsShardResponseProcessor;
 import org.apache.solr.search.grouping.distributed.responseprocessor.TopGroups2ShardResponseProcessor;
+import org.apache.solr.search.grouping.distributed.shardresultserializer.SearchGroups2FirstPassResultTransformer;
 import org.apache.solr.search.grouping.distributed.shardresultserializer.SearchGroups2ResultTransformer;
-import org.apache.solr.search.grouping.distributed.shardresultserializer.SearchGroupsResultTransformer;
 import org.apache.solr.search.grouping.distributed.shardresultserializer.TopGroups2ResultTransformer;
 import org.apache.solr.search.grouping.distributed.shardresultserializer.TopGroupsResultTransformer;
 import org.apache.solr.search.grouping.endresulttransformer.EndResultTransformer;
@@ -242,18 +240,18 @@ public class QueryComponentGrouping2 extends QueryComponent{
 
           // use the first field for first level grouping
           String field = groupingSpec.getField();
-          SearchGroupsFieldCommand groupCommand = new SearchGroupsFieldCommand.Builder()
-              .setField(schema.getField(field))
+          topsGroupsActionBuilder.addCommandField(new SearchGroups2FieldCommand.Builder()
+              .setParentField(schema.getField(field))
               .setGroupSort(groupingSpec.getGroupSort())
               .setTopNGroups(cmd.getOffset() + cmd.getLen())
               .setIncludeGroupCount(groupingSpec.isIncludeGroupCount())
-              .build(); 
-          topsGroupsActionBuilder.addCommandField(groupCommand);
+              .build()
+        		);
           CommandHandler commandHandler = topsGroupsActionBuilder.build();
           commandHandler.execute();
           rsp.add("totalHitCount", -1);
        
-          SearchGroupsResultTransformer serializer = new SearchGroupsResultTransformer(searcher);
+          SearchGroups2FirstPassResultTransformer serializer = new SearchGroups2FirstPassResultTransformer(searcher);
           rsp.add("firstPhase", commandHandler.processResult(result, serializer));
           rb.setResult(result);
           return;

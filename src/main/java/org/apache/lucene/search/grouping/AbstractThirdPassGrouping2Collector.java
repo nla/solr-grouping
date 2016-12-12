@@ -47,7 +47,7 @@ public abstract class AbstractThirdPassGrouping2Collector<GROUP_VALUE_TYPE, SUBG
   private final Sort withinGroupSort;
   private final int maxDocsPerGroup;
   private final boolean needsScores;
-  protected final Map<GROUP_VALUE_TYPE, Map<SUBGROUP_VALUE_TYPE, SearchGroupDocs<GROUP_VALUE_TYPE>>> groupMap;
+  protected final Map<GROUP_VALUE_TYPE, Map<SUBGROUP_VALUE_TYPE, SearchGroupDocs<SUBGROUP_VALUE_TYPE>>> groupMap;
 
   protected SearchGroupDocs<GROUP_VALUE_TYPE>[][] groupDocs;
 
@@ -72,7 +72,7 @@ public abstract class AbstractThirdPassGrouping2Collector<GROUP_VALUE_TYPE, SUBG
     this.groupMap = new HashMap<>(groups.size());
     for (CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> group : groups) {
       //System.out.println("  prep group=" + (group.groupValue == null ? "null" : group.groupValue.utf8ToString()));
-    	HashMap<SUBGROUP_VALUE_TYPE, SearchGroupDocs<GROUP_VALUE_TYPE>> groupDocs = new HashMap<>(group.subGroups.size());
+    	HashMap<SUBGROUP_VALUE_TYPE, SearchGroupDocs<SUBGROUP_VALUE_TYPE>> groupDocs = new HashMap<>(group.subGroups.size());
     	for(SearchGroup<SUBGROUP_VALUE_TYPE> subGroup : group.subGroups){
 //      	System.out.println("                    "+subGroup.groupValue);
 	      final TopDocsCollector<?> collector;
@@ -83,7 +83,7 @@ public abstract class AbstractThirdPassGrouping2Collector<GROUP_VALUE_TYPE, SUBG
 	        // Sort by fields
 	        collector = TopFieldCollector.create(withinGroupSort, maxDocsPerGroup, fillSortFields, getScores, getMaxScores);
 	      }
-	      groupDocs.put(subGroup.groupValue, new SearchGroupDocs<>(group.groupValue, collector));
+	      groupDocs.put(subGroup.groupValue, new SearchGroupDocs<>(subGroup.groupValue, collector));
     	}
       groupMap.put(group.groupValue, groupDocs);
     }
@@ -128,14 +128,14 @@ public abstract class AbstractThirdPassGrouping2Collector<GROUP_VALUE_TYPE, SUBG
   @Override
   protected void doSetNextReader(LeafReaderContext readerContext) throws IOException {
     //System.out.println("SP.setNextReader");
-    for (Map<SUBGROUP_VALUE_TYPE,SearchGroupDocs<GROUP_VALUE_TYPE>> parentGroup : groupMap.values()) {
-      for (SearchGroupDocs<GROUP_VALUE_TYPE> group : parentGroup.values()) {
+    for (Map<SUBGROUP_VALUE_TYPE,SearchGroupDocs<SUBGROUP_VALUE_TYPE>> parentGroup : groupMap.values()) {
+      for (SearchGroupDocs<SUBGROUP_VALUE_TYPE> group : parentGroup.values()) {
       	group.leafCollector = group.collector.getLeafCollector(readerContext);
       }
     }
   }
 
-  public TopGroups<GROUP_VALUE_TYPE> getTopGroups(int withinGroupOffset) {
+  public TopGroups2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> getTopGroups(int withinGroupOffset) {
     @SuppressWarnings({"unchecked","rawtypes"})
     final List<Group2Docs<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>> groupDocsResult = new ArrayList<>();
 
@@ -144,11 +144,11 @@ public abstract class AbstractThirdPassGrouping2Collector<GROUP_VALUE_TYPE, SUBG
 //    System.out.println("Get Top groups.");
     for(CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> group : groups) {
 //    	System.out.println("       " + group.groupValue);
-    	final Map<SUBGROUP_VALUE_TYPE, SearchGroupDocs<GROUP_VALUE_TYPE>> subMap = groupMap.get(group.groupValue);
+    	final Map<SUBGROUP_VALUE_TYPE, SearchGroupDocs<SUBGROUP_VALUE_TYPE>> subMap = groupMap.get(group.groupValue);
       for(SearchGroup<SUBGROUP_VALUE_TYPE> subGroup : (Collection<SearchGroup<SUBGROUP_VALUE_TYPE>>)group.subGroups) {
 //    	for(Map.Entry<GROUP_VALUE_TYPE, SearchGroupDocs<GROUP_VALUE_TYPE>> e : subMap.entrySet()){
 //      	System.out.println("              " + subGroup.groupValue);
-	      final SearchGroupDocs<GROUP_VALUE_TYPE> groupDocs = subMap.get(subGroup.groupValue);
+	      final SearchGroupDocs<SUBGROUP_VALUE_TYPE> groupDocs = subMap.get(subGroup.groupValue);
 	      final TopDocs topDocs = groupDocs.collector.topDocs(withinGroupOffset, maxDocsPerGroup);
 	      groupDocsResult.add(new Group2Docs<>(Float.NaN,
 	                                                                    topDocs.getMaxScore(),
