@@ -114,7 +114,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
     } catch (IllegalArgumentException e) {
       throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, String.format(Locale.ROOT, "Illegal %s parameter", GroupParams.GROUP_FORMAT));
     }
-    groupingSpec.setResponseFormat(responseFormat);
+    groupingSpec.setResponseFormat(Grouping.Format.grouped);
 
     groupingSpec.setFields(params.getParams(GroupParams.GROUP_FIELD));
     groupingSpec.setQueries(params.getParams(GroupParams.GROUP_QUERY));
@@ -128,12 +128,22 @@ public class QueryComponentGrouping2 extends QueryComponent{
     groupingSpec.setNeedScore((rb.getFieldFlags() & SolrIndexSearcher.GET_SCORES) != 0);
     groupingSpec.setTruncateGroups(params.getBool(GroupParams.GROUP_TRUNCATE, false));
     
+  	if(groupingSpec.getFields() == null || groupingSpec.getFields().length == 0){
+      throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "First level group must be specified.");
+  	}
+  	if(groupingSpec.getFields() != null && groupingSpec.getFields().length != 1){
+  		throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "First level group can only be single.");
+  	}
+
     // check for second level grouping
     String f = groupingSpec.getField();
     String[] names = params.getParams(GroupParams.GROUP_FIELD + "."+f);
+  	if(names == null || names.length == 0){
+      throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Second level group must be specified.");
+  	}
   	if(names != null && names.length > 0){
   		if(names.length > 1){
-  			throw new IllegalStateException("Second level group can only be single.");
+  			throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Second level group can only be single.");
   		}
   		groupingSpec.setSubField(names[0]);
   	}
