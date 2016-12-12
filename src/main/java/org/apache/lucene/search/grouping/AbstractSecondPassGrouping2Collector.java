@@ -103,7 +103,9 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUB
   	// as this is the parent collector we go through the top groups from the first pass 
   	// and add the second level data
   	for(CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> g : topGroupsFirstPass){
-  		g.subGroups = collectors.get(g.groupValue).getTopGroups(groupOffset, fillFields);
+  		AbstractSecondPassGrouping2Collector collector = collectors.get(g.groupValue); 
+  		g.subGroups = collector.getTopGroups(groupOffset, fillFields);
+  		g.groupCount = collector.totalHitCount;
   	}
   	return topGroupsFirstPass;
   }
