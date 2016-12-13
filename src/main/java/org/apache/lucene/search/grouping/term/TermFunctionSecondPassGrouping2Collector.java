@@ -122,6 +122,9 @@ public class TermFunctionSecondPassGrouping2Collector extends AbstractSecondPass
   		return (MutableValue)parent.getDocGroupValue(doc);
   	}
     filler.fillValue(doc);
+    if(!mval.exists()){
+    	return null;
+    }
     return mval;
 	}
 

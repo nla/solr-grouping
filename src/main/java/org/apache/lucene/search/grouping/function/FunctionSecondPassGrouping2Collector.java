@@ -113,6 +113,9 @@ public class FunctionSecondPassGrouping2Collector extends AbstractSecondPassGrou
   		return (MutableValue)parent.getDocGroupValue(doc);
   	}
     filler.fillValue(doc);
+    if(!mval.exists()){
+    	return null;
+    }
     return mval;
   }
   
@@ -122,6 +125,9 @@ public class FunctionSecondPassGrouping2Collector extends AbstractSecondPassGrou
   		return (MutableValue)parent.getDocGroupParentValue(doc);
   	}
     parentFiller.fillValue(doc);
+    if(!parentMVal.exists()){
+    	return null;
+    }
     return parentMVal;
 	}
 

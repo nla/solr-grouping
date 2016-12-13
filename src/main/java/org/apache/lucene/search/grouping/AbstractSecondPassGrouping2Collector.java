@@ -146,7 +146,7 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUB
       if (upto++ < groupOffset) {
         continue;
       }
-      //System.out.println("  group=" + (group.groupValue == null ? "null" : group.groupValue.utf8ToString()));
+      //System.out.println("  group=" + (group.groupValue == null ? "null" : group.groupValue));
       CollectedSearchGroup2<SUBGROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> searchGroup = new CollectedSearchGroup2<>();
       searchGroup.groupValue = group.groupValue;
       if (fillFields) {
@@ -223,6 +223,9 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUB
     final SUBGROUP_VALUE_TYPE groupValue;
 
     groupValue = getDocGroupValue(doc);
+    if(groupValue == null){
+    	return; // don't wand grouping by null.
+    }
     group = groupMap.get(groupValue);
     
     if (group == null) {

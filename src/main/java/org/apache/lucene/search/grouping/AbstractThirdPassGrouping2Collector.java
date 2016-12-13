@@ -71,10 +71,10 @@ public abstract class AbstractThirdPassGrouping2Collector<GROUP_VALUE_TYPE, SUBG
 
     this.groupMap = new HashMap<>(groups.size());
     for (CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> group : groups) {
-      System.out.println("  prep group=" + (group.groupValue == null ? "null" : group.groupValue));
+//      System.out.println("  prep group=" + (group.groupValue == null ? "null" : group.groupValue));
     	HashMap<SUBGROUP_VALUE_TYPE, SearchGroupDocs<SUBGROUP_VALUE_TYPE>> groupDocs = new HashMap<>(group.subGroups.size());
     	for(SearchGroup<SUBGROUP_VALUE_TYPE> subGroup : group.subGroups){
-      	System.out.println("                    "+subGroup.groupValue);
+//      	System.out.println("                    "+subGroup.groupValue);
 	      final TopDocsCollector<?> collector;
 	      if (withinGroupSort.equals(Sort.RELEVANCE)) { // optimize to use TopScoreDocCollector
 	        // Sort by score

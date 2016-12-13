@@ -180,7 +180,7 @@ abstract public class AbstractFirstPassGrouping2Collector<GROUP_VALUE_TYPE> exte
 
     final GROUP_VALUE_TYPE groupValue = getDocGroupValue(doc);
     if(groupValue == null){
-    	return;
+    	return; // don't wand grouping by null.
     }
 
     final CollectedSearchGroup<GROUP_VALUE_TYPE> group = groupMap.get(groupValue);
