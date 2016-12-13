@@ -190,6 +190,35 @@ public class Group2Converter {
     }
     return result;
   }
+  public static Collection<CollectedSearchGroup2> toCollectorTypes(SchemaField field, 
+  		SchemaField subField, Collection<CollectedSearchGroup2<BytesRef, BytesRef>> values) {
+    List<CollectedSearchGroup2> result = new ArrayList<>(values.size());
+    for (CollectedSearchGroup2<?,?> original : values) {
+      CollectedSearchGroup2 converted = new CollectedSearchGroup2();
+      converted.sortValues = original.sortValues; 
+      if(field.getType().getNumericType() != null){
+      	converted.groupValue = convertToMutableValue(field, original.groupValue);
+      }
+      else{
+      	converted.groupValue = original.groupValue;
+      }
+      converted.groupCount = original.groupCount;
+      converted.subGroups = new ArrayList<>();
+      for(SearchGroup<?> subOriginal : original.subGroups){
+      	SearchGroup subConverted = new SearchGroup<>();
+      	subConverted.sortValues = subOriginal.sortValues;
+        if(subField.getType().getNumericType() != null){
+      	subConverted.groupValue = convertToMutableValue(subField, subOriginal.groupValue);
+        }
+        else{
+        	subConverted.groupValue = subOriginal.groupValue;
+        }
+      	converted.subGroups.add(subConverted);
+      }
+      result.add(converted);
+    }
+    return result;
+  }
   
   public static TopGroups2<BytesRef, BytesRef> fromMutable(SchemaField field, SchemaField subField,
   		TopGroups2<MutableValue, MutableValue> values) {

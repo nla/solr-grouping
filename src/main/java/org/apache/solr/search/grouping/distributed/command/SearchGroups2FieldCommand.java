@@ -34,8 +34,10 @@ import org.apache.lucene.search.grouping.SearchGroup;
 import org.apache.lucene.search.grouping.function.FunctionAllGroupsCollector;
 import org.apache.lucene.search.grouping.function.FunctionFirstPassGrouping2Collector;
 import org.apache.lucene.search.grouping.function.FunctionSecondPassGrouping2Collector;
+import org.apache.lucene.search.grouping.function.FunctionTermSecondPassGrouping2Collector;
 import org.apache.lucene.search.grouping.term.TermAllGroupsCollector;
 import org.apache.lucene.search.grouping.term.TermFirstPassGrouping2Collector;
+import org.apache.lucene.search.grouping.term.TermFunctionSecondPassGrouping2Collector;
 import org.apache.lucene.search.grouping.term.TermSecondPassGrouping2Collector;
 import org.apache.lucene.util.BytesRef;
 import org.apache.solr.schema.FieldType;
@@ -121,10 +123,10 @@ public class SearchGroups2FieldCommand implements Command<SearchGroupsFieldComma
   @Override
   public List<Collector> create() throws IOException {
     final List<Collector> collectors = new ArrayList<>(2);
-    final FieldType fieldType = parentField.getType();
+    final FieldType parentFieldType = parentField.getType();
     if (topNGroups > 0) {
       if(searchGroups == null){
-        if (fieldType.getNumericType() != null) {
+        if (parentFieldType.getNumericType() != null) {
         	firstPassGroupingCollector = new FunctionFirstPassGrouping2Collector(parentField, groupSort, topNGroups);
         }
         else{
@@ -133,10 +135,20 @@ public class SearchGroups2FieldCommand implements Command<SearchGroupsFieldComma
         collectors.add(firstPassGroupingCollector);
       }
       else{
-      	if (fieldType.getNumericType() != null) {
+        final FieldType fieldType = field.getType();
+      	if (fieldType.getNumericType() != null && parentFieldType.getNumericType() != null) {
       		secondPassGroupingCollector = new FunctionSecondPassGrouping2Collector(field, parentField, 
       				null,  searchGroups, groupSort, topNGroups);
-      	} else {
+      	} 
+      	else if(parentFieldType.getNumericType() != null && fieldType.getNumericType() == null){
+      		secondPassGroupingCollector = new FunctionTermSecondPassGrouping2Collector(field, parentField, 
+      				null,  searchGroups, groupSort, topNGroups);
+      	}
+      	else if(parentFieldType.getNumericType() == null && fieldType.getNumericType() != null){
+      		secondPassGroupingCollector = new TermFunctionSecondPassGrouping2Collector(field, parentField, 
+      				null,  searchGroups, groupSort, topNGroups);
+      	}
+      	else{
       		secondPassGroupingCollector = new TermSecondPassGrouping2Collector(field.getName(), parentField.getName(), 
       				null,  searchGroups, groupSort, topNGroups);
 //        firstPassGroupingCollector = new TermFirstPassGroupingCollector(field.getName(), (parentField == null ? null : parentField.getName()), 
@@ -150,15 +162,15 @@ public class SearchGroups2FieldCommand implements Command<SearchGroupsFieldComma
       	collectors.add(secondPassGroupingCollector);
       }
     }
-    if (includeGroupCount) {
-      if (fieldType.getNumericType() != null) {
-        ValueSource vs = fieldType.getValueSource(field, null);
-        allGroupsCollector = new FunctionAllGroupsCollector(vs, new HashMap<Object,Object>());
-      } else {
-        allGroupsCollector = new TermAllGroupsCollector(field.getName());
-      }
-      collectors.add(allGroupsCollector);
-    }
+//    if (includeGroupCount) {
+//      if (fieldType.getNumericType() != null) {
+//        ValueSource vs = fieldType.getValueSource(field, null);
+//        allGroupsCollector = new FunctionAllGroupsCollector(vs, new HashMap<Object,Object>());
+//      } else {
+//        allGroupsCollector = new TermAllGroupsCollector(field.getName());
+//      }
+//      collectors.add(allGroupsCollector);
+//    }
     return collectors;
   }
 

@@ -16,32 +16,27 @@
  */
 package org.apache.solr.search.grouping.distributed.command;
 
-import org.apache.lucene.queries.function.ValueSource;
-import org.apache.lucene.search.Collector;
-import org.apache.lucene.search.Sort;
-import org.apache.lucene.search.grouping.AbstractSecondPassGrouping2Collector;
-import org.apache.lucene.search.grouping.AbstractSecondPassGroupingCollector;
-import org.apache.lucene.search.grouping.AbstractThirdPassGrouping2Collector;
-import org.apache.lucene.search.grouping.CollectedSearchGroup2;
-import org.apache.lucene.search.grouping.GroupDocs;
-import org.apache.lucene.search.grouping.SearchGroup;
-import org.apache.lucene.search.grouping.TopGroups;
-import org.apache.lucene.search.grouping.function.FunctionSecondPassGroupingCollector;
-import org.apache.lucene.search.grouping.function.FunctionThirdPassGrouping2Collector;
-import org.apache.lucene.search.grouping.term.TermSecondPassGroupingCollector;
-import org.apache.lucene.search.grouping.term.TermThirdPassGrouping2Collector;
-import org.apache.lucene.util.BytesRef;
-import org.apache.lucene.util.mutable.MutableValue;
-import org.apache.solr.schema.FieldType;
-import org.apache.solr.schema.SchemaField;
-import org.apache.solr.search.grouping.Command;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
+
+import org.apache.lucene.queries.function.ValueSource;
+import org.apache.lucene.search.Collector;
+import org.apache.lucene.search.Sort;
+import org.apache.lucene.search.grouping.AbstractThirdPassGrouping2Collector;
+import org.apache.lucene.search.grouping.CollectedSearchGroup2;
+import org.apache.lucene.search.grouping.GroupDocs;
+import org.apache.lucene.search.grouping.TopGroups;
+import org.apache.lucene.search.grouping.function.FunctionTermThirdPassGrouping2Collector;
+import org.apache.lucene.search.grouping.function.FunctionThirdPassGrouping2Collector;
+import org.apache.lucene.search.grouping.term.TermFunctionThirdPassGrouping2Collector;
+import org.apache.lucene.search.grouping.term.TermThirdPassGrouping2Collector;
+import org.apache.lucene.util.BytesRef;
+import org.apache.solr.schema.FieldType;
+import org.apache.solr.schema.SchemaField;
+import org.apache.solr.search.grouping.Command;
 
 /**
  * Defines all collectors for retrieving the second phase and how to handle the collector result.
@@ -144,15 +139,31 @@ public class TopGroups2FieldCommand implements Command<TopGroups<BytesRef>> {
     }
 
     final List<Collector> collectors = new ArrayList<>(1);
+    final FieldType parentFieldType = parentField.getType();
     final FieldType fieldType = field.getType();
-    if (fieldType.getNumericType() != null) {
+    if (fieldType.getNumericType() != null && parentFieldType.getNumericType() != null) {
       ValueSource vs = fieldType.getValueSource(field, null);
-      Collection<CollectedSearchGroup2<MutableValue, MutableValue>> v = 
-      		Group2Converter.toMutable(parentField, field, firstPhaseGroups);
+      Collection v = 
+      		Group2Converter.toCollectorTypes(parentField, field, firstPhaseGroups);
       thirdPassCollector = new FunctionThirdPassGrouping2Collector(field, parentField,
           v, groupSort, sortWithinGroup, maxDocPerGroup, needScores, needMaxScore, true
       );
-    } else {
+    }
+    else if(fieldType.getNumericType() == null && parentFieldType.getNumericType() != null){
+      Collection v = 
+      		Group2Converter.toCollectorTypes(parentField, field, firstPhaseGroups);
+      thirdPassCollector = new FunctionTermThirdPassGrouping2Collector(field, parentField,
+          v, groupSort, sortWithinGroup, maxDocPerGroup, needScores, needMaxScore, true
+      );    	
+    }
+    else if(fieldType.getNumericType() != null && parentFieldType.getNumericType() == null){
+      Collection v = 
+      		Group2Converter.toCollectorTypes(parentField, field, firstPhaseGroups);
+      thirdPassCollector = new TermFunctionThirdPassGrouping2Collector(field, parentField,
+          v, groupSort, sortWithinGroup, maxDocPerGroup, needScores, needMaxScore, true
+      );    	
+    }
+    else {
       thirdPassCollector = new TermThirdPassGrouping2Collector(
       		field.getName(), parentField.getName(), firstPhaseGroups, groupSort, sortWithinGroup, maxDocPerGroup, needScores, needMaxScore, true
       );
@@ -168,12 +179,7 @@ public class TopGroups2FieldCommand implements Command<TopGroups<BytesRef>> {
       return new TopGroups<>(groupSort.getSort(), sortWithinGroup.getSort(), 0, 0, new GroupDocs[0], Float.NaN);
     }
 
-    FieldType fieldType = field.getType();
-    if (fieldType.getNumericType() != null) {
-      return Group2Converter.fromMutable(parentField, field, thirdPassCollector.getTopGroups(0));
-    } else {
-      return thirdPassCollector.getTopGroups(0);
-    }
+    return Group2Converter.fromMutable(parentField, field, thirdPassCollector.getTopGroups(0));
   }
 
   @Override

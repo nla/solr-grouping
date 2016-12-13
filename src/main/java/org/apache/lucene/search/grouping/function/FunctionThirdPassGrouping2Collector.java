@@ -77,7 +77,6 @@ public class FunctionThirdPassGrouping2Collector extends AbstractThirdPassGroupi
   	groupByVS = groupField.getType().getValueSource(groupField, null);
   	parentVsContext = new HashMap<>();
   	vsContext = new HashMap<>();
-
   }
 
   @Override

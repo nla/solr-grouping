@@ -1,4 +1,4 @@
-package org.apache.lucene.search.grouping.function;
+package org.apache.lucene.search.grouping.term;
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
@@ -32,6 +32,8 @@ import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.grouping.AbstractSecondPassGrouping2Collector;
 import org.apache.lucene.search.grouping.CollectedSearchGroup2;
 import org.apache.lucene.search.grouping.SearchGroup;
+import org.apache.lucene.search.grouping.function.FunctionSecondPassGrouping2Collector;
+import org.apache.lucene.util.ArrayUtil;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.BytesRefBuilder;
 import org.apache.lucene.util.mutable.MutableValue;
@@ -46,24 +48,20 @@ import org.apache.solr.search.grouping.distributed.command.Group2Converter;
  *
  * @lucene.experimental
  */
-public class FunctionSecondPassGrouping2Collector extends AbstractSecondPassGrouping2Collector<MutableValue, MutableValue> {
+public class TermFunctionSecondPassGrouping2Collector extends AbstractSecondPassGrouping2Collector<BytesRef, MutableValue> {
 
-  private SortedDocValues index;
-  private SortedDocValues indexParent;
+  private SortedDocValues parentIndex;
   private String groupField;
   private SchemaField groupSchemaField;
   private String groupParentField;
   private SchemaField groupParentSchemaField;
 
-  private FunctionValues.ValueFiller parentFiller;
-  private MutableValue parentMVal;
-  private ValueSource parentGroupByVS;
-  private Map<?, ?> parentVsContext;
   private FunctionValues.ValueFiller filler;
   private MutableValue mval;
   private ValueSource groupByVS;
   private Map<?, ?> vsContext;
 
+  
   /**
    * Create the first pass collector.
    *
@@ -80,8 +78,8 @@ public class FunctionSecondPassGrouping2Collector extends AbstractSecondPassGrou
    *  @param topNGroups How many top groups to keep.
    *  @throws IOException When I/O related errors occur
    */
-  public FunctionSecondPassGrouping2Collector(SchemaField groupField, SchemaField groupParentField,
-  		AbstractSecondPassGrouping2Collector parent,
+  public TermFunctionSecondPassGrouping2Collector(SchemaField groupField, SchemaField groupParentField,
+  		AbstractSecondPassGrouping2Collector<?, ?> parent,
   		Collection<SearchGroup<BytesRef>> topGroups, Sort groupSort, int topNGroups) throws IOException {
     super(groupSort, topNGroups);
     this.groupField = groupField.getName();
@@ -91,15 +89,13 @@ public class FunctionSecondPassGrouping2Collector extends AbstractSecondPassGrou
     this.topGroupsFirstPass = new ArrayList<>();
     if(parent == null){
     	// this is the parent so setup the document readers.
-    	parentGroupByVS = groupParentField.getType().getValueSource(groupParentField, null);
     	groupByVS = groupField.getType().getValueSource(groupField, null);
-    	parentVsContext = new HashMap<>();
     	vsContext = new HashMap<>();
     }
     if(topGroups != null){
-      Collection<SearchGroup<MutableValue>> topGroupsMV = Group2Converter.toMutable(groupParentField, topGroups);
+      Collection<SearchGroup<BytesRef>> topGroupsMV = topGroups;
     	collectors = new HashMap<>();
-	    for(SearchGroup<MutableValue> e : topGroupsMV){
+	    for(SearchGroup<BytesRef> e : topGroupsMV){
 	    	FunctionSecondPassGrouping2Collector c = new FunctionSecondPassGrouping2Collector(groupField, groupParentField, this, null, groupSort, topNGroups);
 	    	collectors.put(e.groupValue, c);
 	    	topGroupsFirstPass.add(new CollectedSearchGroup2(e));
@@ -108,21 +104,25 @@ public class FunctionSecondPassGrouping2Collector extends AbstractSecondPassGrou
   }
 
   @Override
-  public MutableValue getDocGroupValue(int doc) {
+  public BytesRef getDocGroupParentValue(int doc) {
+  	if(parent != null){
+  		return (BytesRef)parent.getDocGroupParentValue(doc);
+  	}
+    final int ord = parentIndex.getOrd(doc);
+    if (ord == -1) {
+      return null;
+    } else {
+      return parentIndex.lookupOrd(ord);
+    }
+  }
+  
+	@Override
+	public MutableValue getDocGroupValue(int doc){
   	if(parent != null){
   		return (MutableValue)parent.getDocGroupValue(doc);
   	}
     filler.fillValue(doc);
     return mval;
-  }
-  
-	@Override
-	public MutableValue getDocGroupParentValue(int doc){
-  	if(parent != null){
-  		return (MutableValue)parent.getDocGroupParentValue(doc);
-  	}
-    parentFiller.fillValue(doc);
-    return parentMVal;
 	}
 
   @Override
@@ -134,29 +134,12 @@ public class FunctionSecondPassGrouping2Collector extends AbstractSecondPassGrou
     return groupValue.duplicate();
   }
 
-
   @Override
   protected void doSetNextReader(LeafReaderContext readerContext) throws IOException {
     super.doSetNextReader(readerContext);
-    FunctionValues values = groupByVS.getValues(vsContext, readerContext);
+    parentIndex = DocValues.getSorted(readerContext.reader(), groupParentField);
+    FunctionValues  values = groupByVS.getValues(vsContext, readerContext);
     filler = values.getValueFiller();
     mval = filler.getValue();
-    values = parentGroupByVS.getValues(parentVsContext, readerContext);
-    parentFiller = values.getValueFiller();
-    parentMVal = parentFiller.getValue();
   }
-  
-  public SchemaField getGroupParentSchemaFieldx(){
-		return groupParentSchemaField;
-	}
-  public SchemaField getGroupSchemaFieldx(){
-		return groupSchemaField;
-	}
-  
-//  @Override
-//  protected BytesRef getValueAsBytesRefx(MutableValue ref){
-//    BytesRefBuilder binary = new BytesRefBuilder();
-//    groupSchemaField.getType().readableToIndexed(ref.toString(), binary);
-//    return binary.get();
-//  }
 }

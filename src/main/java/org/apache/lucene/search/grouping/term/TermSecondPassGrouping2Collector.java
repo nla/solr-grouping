@@ -48,7 +48,6 @@ public class TermSecondPassGrouping2Collector extends AbstractSecondPassGrouping
   private String groupField;
   private String groupParentField;
   
-  private TermSecondPassGrouping2Collector parent;
   
   /**
    * Create the first pass collector.
@@ -66,7 +65,7 @@ public class TermSecondPassGrouping2Collector extends AbstractSecondPassGrouping
    *  @param topNGroups How many top groups to keep.
    *  @throws IOException When I/O related errors occur
    */
-  public TermSecondPassGrouping2Collector(String groupField, String groupParentField, TermSecondPassGrouping2Collector parent,
+  public TermSecondPassGrouping2Collector(String groupField, String groupParentField, AbstractSecondPassGrouping2Collector<?, ?> parent,
   		Collection<SearchGroup<BytesRef>> topGroups, Sort groupSort, int topNGroups) throws IOException {
     super(groupSort, topNGroups);
     this.groupField = groupField;
@@ -84,17 +83,17 @@ public class TermSecondPassGrouping2Collector extends AbstractSecondPassGrouping
   }
 
   @Override
-  protected BytesRef getDocGroupValue(int doc) {
+  public BytesRef getDocGroupValue(int doc) {
   	if(parent != null){
-  		return parent.getDocGroupValue(doc);
+  		return (BytesRef)parent.getDocGroupValue(doc);
   	}
   	return getDocGroupValue(doc, index);
   }
   
 	@Override
-	protected BytesRef getDocGroupParentValue(int doc){
+	public BytesRef getDocGroupParentValue(int doc){
   	if(parent != null){
-  		return parent.getDocGroupParentValue(doc);
+  		return (BytesRef)parent.getDocGroupParentValue(doc);
   	}
   	return getDocGroupValue(doc, indexParent);
 	}
@@ -130,8 +129,8 @@ public class TermSecondPassGrouping2Collector extends AbstractSecondPassGrouping
     indexParent = DocValues.getSorted(readerContext.reader(), groupParentField);
   }
   
-  @Override
-  protected BytesRef getValueAsBytesRef(BytesRef ref){
-  	return ref;
-  }
+//  @Override
+//  protected BytesRef getValueAsBytesRefx(BytesRef ref){
+//  	return ref;
+//  }
 }

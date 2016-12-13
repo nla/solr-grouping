@@ -19,6 +19,7 @@ package org.apache.lucene.search.grouping;
 
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.search.*;
+import org.apache.lucene.search.grouping.term.TermSecondPassGrouping2Collector;
 import org.apache.lucene.util.BytesRef;
 
 import java.io.IOException;
@@ -41,14 +42,15 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUB
   private final int[] reversed;
   private final int topNGroups;
   private final boolean needsScores;
-  protected Map<GROUP_VALUE_TYPE, CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>> groupMap;
+  protected Map<SUBGROUP_VALUE_TYPE, CollectedSearchGroup2<SUBGROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>> groupMap;
   private final int compIDXEnd;
   protected Collection<CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>> topGroupsFirstPass;
   protected Map<GROUP_VALUE_TYPE, AbstractSecondPassGrouping2Collector<SUBGROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>> collectors;
+  protected AbstractSecondPassGrouping2Collector<?, ?> parent;
 
   // Set once we reach topNGroups unique groups:
   /** @lucene.internal */
-  protected TreeSet<CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>> orderedGroups;
+  protected TreeSet<CollectedSearchGroup2<SUBGROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>> orderedGroups;
   private int docBase;
   private int spareSlot;
 
@@ -110,7 +112,7 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUB
   	return topGroupsFirstPass;
   }
 
-  protected abstract BytesRef getValueAsBytesRef(GROUP_VALUE_TYPE ref);
+//  protected abstract BytesRef getValueAsBytesRefx(GROUP_VALUE_TYPE ref);
 
   /**
    * Returns top groups, starting from offset.  This may
@@ -121,7 +123,7 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUB
    * @param fillFields Whether to fill to {@link SearchGroup2#sortValues}
    * @return top groups, starting from offset
    */
-  public Collection<SearchGroup<GROUP_VALUE_TYPE>> getTopGroups(int groupOffset, boolean fillFields) {
+  public Collection<SearchGroup<SUBGROUP_VALUE_TYPE>> getTopGroups(int groupOffset, boolean fillFields) {
 
     //System.out.println("FP.getTopGroups groupOffset=" + groupOffset + " fillFields=" + fillFields + " groupMap.size()=" + groupMap.size());
 
@@ -137,15 +139,15 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUB
       buildSortedSet();
     }
 
-    final Collection<SearchGroup<GROUP_VALUE_TYPE>> result = new ArrayList<>();
+    final Collection<SearchGroup<SUBGROUP_VALUE_TYPE>> result = new ArrayList<>();
     int upto = 0;
     final int sortFieldCount = comparators.length;
-    for(CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> group : orderedGroups) {
+    for(CollectedSearchGroup2<SUBGROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> group : orderedGroups) {
       if (upto++ < groupOffset) {
         continue;
       }
       //System.out.println("  group=" + (group.groupValue == null ? "null" : group.groupValue.utf8ToString()));
-      CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> searchGroup = new CollectedSearchGroup2<>();
+      CollectedSearchGroup2<SUBGROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> searchGroup = new CollectedSearchGroup2<>();
       searchGroup.groupValue = group.groupValue;
       if (fillFields) {
         searchGroup.sortValues = new Object[sortFieldCount];
@@ -217,8 +219,8 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUB
     // TODO: should we add option to mean "ignore docs that
     // don't have the group field" (instead of stuffing them
     // under null group)?
-    final CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> group;
-    final GROUP_VALUE_TYPE groupValue;
+    final CollectedSearchGroup2<SUBGROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> group;
+    final SUBGROUP_VALUE_TYPE groupValue;
 
     groupValue = getDocGroupValue(doc);
     group = groupMap.get(groupValue);
@@ -236,7 +238,7 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUB
         // just keep collecting them
 
         // Add a new CollectedSearchGroup:
-        CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> sg = new CollectedSearchGroup2<>();
+        CollectedSearchGroup2<SUBGROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> sg = new CollectedSearchGroup2<>();
         sg.groupValue = copyDocGroupValue(groupValue, null);
         sg.comparatorSlot = groupMap.size();
 //        sg.subGroupMap = new HashMap<>();
@@ -257,7 +259,7 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUB
       }
       // We already tested that the document is competitive, so replace
       // the bottom group with this new group.
-      final CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> bottomGroup = orderedGroups.pollLast();
+      final CollectedSearchGroup2<SUBGROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> bottomGroup = orderedGroups.pollLast();
       assert orderedGroups.size() == topNGroups -1;
 
       groupMap.remove(bottomGroup.groupValue);
@@ -307,7 +309,7 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUB
     // Remove before updating the group since lookup is done via comparators
     // TODO: optimize this
 
-    final CollectedSearchGroup<GROUP_VALUE_TYPE> prevLast;
+    final CollectedSearchGroup<SUBGROUP_VALUE_TYPE> prevLast;
     if (orderedGroups != null) {
       prevLast = orderedGroups.last();
       orderedGroups.remove(group);
@@ -372,10 +374,10 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUB
     }
   }
 
-  public Map<GROUP_VALUE_TYPE, CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>> getGroupMap(){
+  public Map<SUBGROUP_VALUE_TYPE, CollectedSearchGroup2<SUBGROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>> getGroupMap(){
 		return groupMap;
 	}
-  public void setGroupMap(Map<GROUP_VALUE_TYPE, CollectedSearchGroup2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>> map){
+  public void setGroupMap(Map<SUBGROUP_VALUE_TYPE, CollectedSearchGroup2<SUBGROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>> map){
   	this.groupMap = map;
 	}
   
@@ -396,7 +398,7 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUB
    * @param doc The specified doc
    * @return the group value for the specified doc
    */
-  protected abstract GROUP_VALUE_TYPE getDocGroupValue(int doc);
+  public abstract SUBGROUP_VALUE_TYPE getDocGroupValue(int doc);
   /**
    * Returns the parent group value for the specified doc.<p/>
    * If this is the collect for the first group then this will return null;
@@ -404,7 +406,7 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUB
    * @param doc The specified doc
    * @return the parent group value for the specified doc
    */
-  protected abstract GROUP_VALUE_TYPE getDocGroupParentValue(int doc);
+  public abstract GROUP_VALUE_TYPE getDocGroupParentValue(int doc);
 
   /**
    * Returns a copy of the specified group value by creating a new instance and copying the value from the specified
@@ -414,7 +416,7 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUB
    * @param reuse Optionally a reuse instance to prevent a new instance creation
    * @return a copy of the specified group value
    */
-  protected abstract GROUP_VALUE_TYPE copyDocGroupValue(GROUP_VALUE_TYPE groupValue, GROUP_VALUE_TYPE reuse);
+  protected abstract SUBGROUP_VALUE_TYPE copyDocGroupValue(SUBGROUP_VALUE_TYPE groupValue, SUBGROUP_VALUE_TYPE reuse);
 
 }
 
