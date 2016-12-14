@@ -462,11 +462,11 @@ public class QueryComponentGrouping2 extends QueryComponent{
         	grouping.addFieldCommand(groupingSpec.getField(), groupingSpec.getSubField(), rb.req);
         }
 
-        if (groupingSpec.getFunctions() != null) {
-          for (String groupByStr : groupingSpec.getFunctions()) {
-            grouping.addFunctionCommand(groupByStr,groupingSpec.getSubField(), rb.req);
-          }
-        }
+//        if (groupingSpec.getFunctions() != null) {
+//          for (String groupByStr : groupingSpec.getFunctions()) {
+//            grouping.addFunctionCommand(groupByStr,groupingSpec.getSubField(), rb.req);
+//          }
+//        }
 
         if (groupingSpec.getQueries() != null) {
           for (String groupByStr : groupingSpec.getQueries()) {

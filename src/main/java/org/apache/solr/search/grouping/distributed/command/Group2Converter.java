@@ -229,7 +229,7 @@ public class Group2Converter {
   }
   
   public static TopGroups2<BytesRef, BytesRef> fromMutable(SchemaField field, SchemaField subField,
-  		TopGroups2<MutableValue, MutableValue> values) {
+  		TopGroups2<?, ?> values) {
     if (values == null) {
       return null;
     }
@@ -240,7 +240,7 @@ public class Group2Converter {
     Group2Docs<BytesRef, BytesRef> groupDocs[] = new Group2Docs[values.groups.length];
     
     for (int i = 0; i < values.groups.length; i++) {
-      Group2Docs<MutableValue, MutableValue> original = values.groups[i];
+      Group2Docs<?, ?> original = values.groups[i];
       final BytesRef groupValue = convertToBytesRef(subField, original.groupValue);
       final BytesRef groupParentValue = convertToBytesRef(field, original.groupParentValue);
       groupDocs[i] = new Group2Docs<BytesRef, BytesRef>(original.score, original.maxScore, original.totalHits, original.scoreDocs, groupParentValue, groupValue, original.groupSortValues);
