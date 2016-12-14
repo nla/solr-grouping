@@ -38,6 +38,7 @@ import org.apache.lucene.util.mutable.MutableValueLong;
 import org.apache.solr.schema.FieldType;
 import org.apache.solr.schema.SchemaField;
 import org.apache.solr.schema.TrieField;
+import org.apache.solr.util.DateFormatUtil;
 
 /** 
  * this is a transition class: for numeric types we use function-based distributed grouping,
@@ -80,7 +81,14 @@ public class Group2Converter {
   		MutableValue mv = (MutableValue)val;
       if (mv.exists) {
         BytesRefBuilder binary = new BytesRefBuilder();
-        field.getType().readableToIndexed(mv.toString(), binary);
+        String s;
+        if(mv instanceof MutableValueDate){
+        	s = DateFormatUtil.formatExternal((Date)mv.toObject());
+        }
+        else{
+        	s = mv.toString();
+        }
+        field.getType().readableToIndexed(s, binary);
         return binary.get();
       } else {
         return null;
