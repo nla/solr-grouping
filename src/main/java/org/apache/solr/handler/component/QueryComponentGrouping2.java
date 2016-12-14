@@ -134,9 +134,11 @@ public class QueryComponentGrouping2 extends QueryComponent{
   	if(groupingSpec.getFields() != null && groupingSpec.getFields().length != 1){
   		throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "First level group can only be single.");
   	}
-
-    // check for second level grouping
     String f = groupingSpec.getField();
+  	if(!searcher.getFieldNames().contains(f)){
+      throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Field {"+f+"} not found in schema.");  		
+  	}
+    // check for second level grouping
     String[] names = params.getParams(GroupParams.GROUP_FIELD + "."+f);
   	if(names == null || names.length == 0){
       throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Second level group must be specified.");
@@ -146,6 +148,10 @@ public class QueryComponentGrouping2 extends QueryComponent{
   			throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Second level group can only be single.");
   		}
   		groupingSpec.setSubField(names[0]);
+  	}
+  	f = names[0];
+  	if(!searcher.getFieldNames().contains(f)){
+      throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Field {"+f+"} not found in schema.");  		
   	}
   }
 	
