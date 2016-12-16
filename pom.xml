@@ -169,15 +169,6 @@
         </exclusions>
     </dependency>
 
-    <!--
-    I want this to pick on chainedFilter from the contrib misc, but no artifact 13jul09
-
-        <dependency>
-          <groupId>org.apache.lucene</groupId>
-          <artifactId>lucene-contrib</artifactId>
-          <version>2.9-SNAPSHOT</version>
-        </dependency>
-    -->
   </dependencies>
 
   <repositories>
@@ -202,18 +193,7 @@
     <url>http://www.nla.gov.au</url>
   </organization>
 
-  <inceptionYear>2007</inceptionYear>
-
-  <scm>
-    <url>http://svn.nla.gov.au/svn/apps/trunk/nlasolr/</url>
-    <connection>scm:svn:http://svn.nla.gov.au/svn/apps/trunk/nlasolr/</connection>
-    <developerConnection>scm:svn:http://svn.nla.gov.au/svn/apps/trunk/nlasolr/</developerConnection>
-  </scm>
-
-  <issueManagement>
-    <system>Jira</system>
-    <url>http://ourweb.nla.gov.au/apps/jira/browse/SBDP</url>
-  </issueManagement>
+  <inceptionYear>2016</inceptionYear>
 
   <distributionManagement>
     <repository>
