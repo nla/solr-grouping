@@ -3,6 +3,7 @@ package org.apache.solr.handler.component;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -14,6 +15,7 @@ import org.apache.lucene.index.Term;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.Sort;
+import org.apache.lucene.search.SortField;
 import org.apache.lucene.search.grouping.CollectedSearchGroup2;
 import org.apache.lucene.search.grouping.GroupDocs;
 import org.apache.lucene.search.grouping.SearchGroup;
@@ -68,6 +70,7 @@ import org.apache.solr.search.stats.StatsCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 public class QueryComponentGrouping2 extends QueryComponent{
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 	
@@ -89,11 +92,23 @@ public class QueryComponentGrouping2 extends QueryComponent{
     rb.setGroupingSpec(groupingSpec);
 
     final SortSpec sortSpec = rb.getSortSpec();
-
+    SchemaField uniqueField = searcher.getSchema().getUniqueKeyField();
     //TODO: move weighting of sort
     Sort groupSort = searcher.weightSort(sortSpec.getSort());
     if (groupSort == null) {
-      groupSort = Sort.RELEVANCE;
+    	// for distributed queries sorting needs to include the unique field
+      if(uniqueField != null){
+      	groupSort = new Sort(SortField.FIELD_SCORE, uniqueField.getSortField(false));
+      }
+      else{
+        groupSort = Sort.RELEVANCE;
+      }
+    }
+    else{
+    	if(uniqueField != null){
+    		// must include unique field
+    		groupSort = checkAddField(groupSort, uniqueField);
+    	}
     }
 
     // groupSort defaults to sort
@@ -101,9 +116,14 @@ public class QueryComponentGrouping2 extends QueryComponent{
     //TODO: move weighting of sort
     Sort sortWithinGroup = groupSortStr == null ?  groupSort : searcher.weightSort(SortSpecParsing.parseSortSpec(groupSortStr, req).getSort());
     if (sortWithinGroup == null) {
-      sortWithinGroup = Sort.RELEVANCE;
+      if(uniqueField != null){
+      	sortWithinGroup = new Sort(SortField.FIELD_SCORE, uniqueField.getSortField(false));
+      }
+      else{
+      	sortWithinGroup = Sort.RELEVANCE;
+      }
     }
-
+    sortWithinGroup = checkAddField(sortWithinGroup, uniqueField);
     groupingSpec.setSortWithinGroup(sortWithinGroup);
     groupingSpec.setGroupSort(groupSort);
 
@@ -155,6 +175,23 @@ public class QueryComponentGrouping2 extends QueryComponent{
   	}
   }
 	
+	private Sort checkAddField(Sort sort, SchemaField uniqueField){
+		// must include unique field
+		boolean uniqueFound = false;
+		for(SortField s : sort.getSort()){
+			if(uniqueField.getName().equals(s.getField())){
+				uniqueFound = true;
+			}
+		}
+		if(!uniqueFound){
+  			// add unique field
+			SortField[] sortFields = Arrays.copyOf(sort.getSort(), sort.getSort().length+1);
+			sortFields[sortFields.length-1] = uniqueField.getSortField(false);
+    	sort = new Sort(sortFields);
+		}
+		return sort;
+	}
+
 	@Override
 	public void process(ResponseBuilder rb) throws IOException{
 
