@@ -39,6 +39,7 @@ import org.apache.solr.schema.FieldType;
 import org.apache.solr.schema.SchemaField;
 import org.apache.solr.schema.TrieField;
 import org.apache.solr.util.DateFormatUtil;
+import org.archive.util.io.EOFObserver;
 
 /** 
  * this is a transition class: for numeric types we use function-based distributed grouping,
@@ -61,11 +62,13 @@ public class Group2Converter {
       	converted.groupCount = org.groupCount;
       	// process subGroups
       	converted.subGroups = new ArrayList<>();
-      	for(SearchGroup<?> sub : org.subGroups){
-      		SearchGroup<BytesRef> subConverted = new SearchGroup<>();
-          subConverted.sortValues = sub.sortValues;
-      		subConverted.groupValue = convertToBytesRef(subField, sub.groupValue); 
-      		converted.subGroups.add(subConverted);
+      	if(org.subGroups != null){
+	      	for(SearchGroup<?> sub : org.subGroups){
+	      		SearchGroup<BytesRef> subConverted = new SearchGroup<>();
+	          subConverted.sortValues = sub.sortValues;
+	      		subConverted.groupValue = convertToBytesRef(subField, sub.groupValue); 
+	      		converted.subGroups.add(subConverted);
+	      	}
       	}
       }
       result.add(converted);
@@ -188,11 +191,13 @@ public class Group2Converter {
       converted.groupValue = convertToMutableValue(field, original.groupValue);
       converted.groupCount = original.groupCount;
       converted.subGroups = new ArrayList<>();
-      for(SearchGroup<?> subOriginal : original.subGroups){
-      	SearchGroup<MutableValue> subConverted = new SearchGroup<>();
-      	subConverted.sortValues = subOriginal.sortValues;
-      	subConverted.groupValue = convertToMutableValue(subField, subOriginal.groupValue);
-      	converted.subGroups.add(subConverted);
+      if(original.subGroups != null){
+	      for(SearchGroup<?> subOriginal : original.subGroups){
+	      	SearchGroup<MutableValue> subConverted = new SearchGroup<>();
+	      	subConverted.sortValues = subOriginal.sortValues;
+	      	subConverted.groupValue = convertToMutableValue(subField, subOriginal.groupValue);
+	      	converted.subGroups.add(subConverted);
+	      }
       }
       result.add(converted);
     }
@@ -212,16 +217,18 @@ public class Group2Converter {
       }
       converted.groupCount = original.groupCount;
       converted.subGroups = new ArrayList<>();
-      for(SearchGroup<?> subOriginal : original.subGroups){
-      	SearchGroup subConverted = new SearchGroup<>();
-      	subConverted.sortValues = subOriginal.sortValues;
-        if(subField.getType().getNumericType() != null){
-      	subConverted.groupValue = convertToMutableValue(subField, subOriginal.groupValue);
-        }
-        else{
-        	subConverted.groupValue = subOriginal.groupValue;
-        }
-      	converted.subGroups.add(subConverted);
+      if(original.subGroups != null){
+	      for(SearchGroup<?> subOriginal : original.subGroups){
+	      	SearchGroup subConverted = new SearchGroup<>();
+	      	subConverted.sortValues = subOriginal.sortValues;
+	        if(subField.getType().getNumericType() != null){
+	      	subConverted.groupValue = convertToMutableValue(subField, subOriginal.groupValue);
+	        }
+	        else{
+	        	subConverted.groupValue = subOriginal.groupValue;
+	        }
+	      	converted.subGroups.add(subConverted);
+	      }
       }
       result.add(converted);
     }
