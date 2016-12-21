@@ -34,6 +34,8 @@ import org.apache.solr.search.SolrIndexSearcher;
 import org.apache.solr.search.grouping.Grouping2Specification;
 import org.apache.solr.search.grouping.distributed.ShardRequestFactory;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
@@ -125,6 +127,7 @@ if(1==1) // for second level we need to check all shards
     String field = null;
     String subField = null;
     final IndexSchema schema = rb.req.getSearcher().getSchema();
+    String fq = "";
     for (Map.Entry<String, Collection<SearchGroup<BytesRef>>> entry : rb.mergedSearchGroups.entrySet()) {
       for (SearchGroup<BytesRef> searchGroup : entry.getValue()) {
       	if(!phaseSet){
@@ -150,6 +153,14 @@ if(1==1) // for second level we need to check all shards
           groupValue = GROUP_NULL_VALUE;
         }
         sreq.params.add(GroupParams.GROUP_DISTRIBUTED_TOPGROUPS_PREFIX + entry.getKey(), groupValue);
+        if(!fq.isEmpty()){
+        	fq += " OR ";
+        }
+        try{
+        	fq += entry.getKey() + ":" + URLEncoder.encode(groupValue, "UTF-8");
+        }catch (UnsupportedEncodingException e){
+        	// ignore
+        }
         if(phaseThree){
         	CollectedSearchGroup2<BytesRef, BytesRef> collectedSearchGroup = (CollectedSearchGroup2<BytesRef, BytesRef>)searchGroup;
         	for(SearchGroup<BytesRef> sg : collectedSearchGroup.subGroups){
@@ -163,9 +174,22 @@ if(1==1) // for second level we need to check all shards
             }
         		 sreq.params.add(GroupParams.GROUP_DISTRIBUTED_TOPGROUPS_PREFIX + entry.getKey()
         		 + "." + groupValue, subGroupValue);
+             if(!fq.isEmpty()){
+              	fq += " OR ";
+              }
+              try{
+             	 fq += entry.getKey() + ":" + URLEncoder.encode(groupValue, "UTF-8");
+             	 fq += " OR " + subField + ":" + URLEncoder.encode(subGroupValue, "UTF-8");
+              }catch (UnsupportedEncodingException e){
+             	 // ignore
+              }
         	}
         }
       }
+    }
+
+    if(!fq.isEmpty()){
+    	sreq.params.add("fq", fq);
     }
 
     if ((rb.getFieldFlags() & SolrIndexSearcher.GET_SCORES) != 0 || rb.getSortSpec().includesScore()) {
