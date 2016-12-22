@@ -157,11 +157,7 @@ if(1==1) // for second level we need to check all shards
         if(!fq.isEmpty()){
         	fq += " OR ";
         }
-        try{
-        	fq += entry.getKey() + ":" + URLEncoder.encode(groupValue, "UTF-8");
-        }catch (UnsupportedEncodingException e){
-        	// ignore
-        }
+        fq += entry.getKey() + ":" + groupValue.replace(":", "\\:");
         if(phaseThree){
         	CollectedSearchGroup2<BytesRef, BytesRef> collectedSearchGroup = (CollectedSearchGroup2<BytesRef, BytesRef>)searchGroup;
         	for(SearchGroup<BytesRef> sg : collectedSearchGroup.subGroups){
@@ -178,11 +174,7 @@ if(1==1) // for second level we need to check all shards
              if(!fq2.isEmpty()){
               	fq2 += " OR ";
              }
-             try{
-             	 fq2 += subField + ":" + URLEncoder.encode(subGroupValue, "UTF-8");
-             }catch (UnsupportedEncodingException e){
-             	 // ignore
-             }
+             fq2 += subField + ":" + subGroupValue.replace(":", "\\:");
         	}
         }
       }
@@ -208,5 +200,4 @@ if(1==1) // for second level we need to check all shards
 
     return new ShardRequest[] {sreq};
   }
-
 }
