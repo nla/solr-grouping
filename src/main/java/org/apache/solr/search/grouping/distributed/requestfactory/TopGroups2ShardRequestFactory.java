@@ -20,6 +20,7 @@ import org.apache.lucene.analysis.reverse.ReverseStringFilter;
 import org.apache.lucene.search.grouping.CollectedSearchGroup2;
 import org.apache.lucene.search.grouping.SearchGroup;
 import org.apache.lucene.util.BytesRef;
+import org.apache.solr.client.solrj.util.ClientUtils;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.Group2Params;
 import org.apache.solr.common.params.GroupParams;
@@ -157,7 +158,7 @@ if(1==1) // for second level we need to check all shards
         if(!fq.isEmpty()){
         	fq += " OR ";
         }
-        fq += entry.getKey() + ":" + groupValue.replace(":", "\\:");
+        fq += entry.getKey() + ":" + ClientUtils.escapeQueryChars(groupValue);
         if(phaseThree){
         	CollectedSearchGroup2<BytesRef, BytesRef> collectedSearchGroup = (CollectedSearchGroup2<BytesRef, BytesRef>)searchGroup;
         	for(SearchGroup<BytesRef> sg : collectedSearchGroup.subGroups){
@@ -169,12 +170,12 @@ if(1==1) // for second level we need to check all shards
             } else {
               subGroupValue = GROUP_NULL_VALUE;
             }
-        		 sreq.params.add(GroupParams.GROUP_DISTRIBUTED_TOPGROUPS_PREFIX + entry.getKey()
-        		 + "." + groupValue, subGroupValue);
-             if(!fq2.isEmpty()){
-              	fq2 += " OR ";
-             }
-             fq2 += subField + ":" + subGroupValue.replace(":", "\\:");
+            sreq.params.add(GroupParams.GROUP_DISTRIBUTED_TOPGROUPS_PREFIX + entry.getKey()
+            	+ "." + groupValue, subGroupValue);
+            if(!fq2.isEmpty()){
+            	fq2 += " OR ";
+            }
+            fq2 += subField + ":" + ClientUtils.escapeQueryChars(subGroupValue);
         	}
         }
       }
