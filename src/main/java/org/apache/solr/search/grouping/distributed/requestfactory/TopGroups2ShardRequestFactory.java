@@ -128,6 +128,7 @@ if(1==1) // for second level we need to check all shards
     String subField = null;
     final IndexSchema schema = rb.req.getSearcher().getSchema();
     String fq = "";
+    String fq2 = "";
     for (Map.Entry<String, Collection<SearchGroup<BytesRef>>> entry : rb.mergedSearchGroups.entrySet()) {
       for (SearchGroup<BytesRef> searchGroup : entry.getValue()) {
       	if(!phaseSet){
@@ -174,15 +175,14 @@ if(1==1) // for second level we need to check all shards
             }
         		 sreq.params.add(GroupParams.GROUP_DISTRIBUTED_TOPGROUPS_PREFIX + entry.getKey()
         		 + "." + groupValue, subGroupValue);
-             if(!fq.isEmpty()){
-              	fq += " OR ";
-              }
-              try{
-             	 fq += entry.getKey() + ":" + URLEncoder.encode(groupValue, "UTF-8");
-             	 fq += " OR " + subField + ":" + URLEncoder.encode(subGroupValue, "UTF-8");
-              }catch (UnsupportedEncodingException e){
+             if(!fq2.isEmpty()){
+              	fq2 += " OR ";
+             }
+             try{
+             	 fq2 += subField + ":" + URLEncoder.encode(subGroupValue, "UTF-8");
+             }catch (UnsupportedEncodingException e){
              	 // ignore
-              }
+             }
         	}
         }
       }
@@ -190,6 +190,9 @@ if(1==1) // for second level we need to check all shards
 
     if(!fq.isEmpty()){
     	sreq.params.add("fq", fq);
+    }
+    if(!fq2.isEmpty()){
+    	sreq.params.add("fq", fq2);
     }
 
     if ((rb.getFieldFlags() & SolrIndexSearcher.GET_SCORES) != 0 || rb.getSortSpec().includesScore()) {
