@@ -125,7 +125,7 @@ public class TopGroups2ResultTransformer implements ShardResultTransformer<List<
         continue;
       }
 
-      Long totalHitCount = (Long) commandResult.get("totalHitCount");
+//      Long totalHitCount = (Long) commandResult.get("totalHitCount");
 
       List<Group2Docs<BytesRef, BytesRef>> groupDocs = new ArrayList<>();
       for (int i = 2; i < commandResult.size(); i++) {// go through all level 1 groups
@@ -154,7 +154,7 @@ public class TopGroups2ResultTransformer implements ShardResultTransformer<List<
       @SuppressWarnings("unchecked")
       Group2Docs<BytesRef, BytesRef>[] groupDocsArr = groupDocs.toArray(new Group2Docs[groupDocs.size()]);
       TopGroups2<BytesRef, BytesRef> topGroups = new TopGroups2<>(
-      		groupSort.getSort(), sortWithinGroup.getSort(), totalHitCount, totalGroupedHitCount, groupDocsArr, Float.NaN
+      		groupSort.getSort(), sortWithinGroup.getSort(), totalGroupedHitCount, groupDocsArr, Float.NaN
       		);
         
       result.put(key, topGroups);

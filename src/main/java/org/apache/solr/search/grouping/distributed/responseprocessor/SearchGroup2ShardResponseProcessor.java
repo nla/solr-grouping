@@ -16,6 +16,17 @@
  */
 package org.apache.solr.search.grouping.distributed.responseprocessor;
 
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.grouping.SearchGroup;
 import org.apache.lucene.util.BytesRef;
@@ -34,11 +45,6 @@ import org.apache.solr.search.grouping.distributed.ShardResponseProcessor;
 import org.apache.solr.search.grouping.distributed.command.SearchGroupsFieldCommandResult;
 import org.apache.solr.search.grouping.distributed.shardresultserializer.SearchGroupsResultTransformer;
 
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.util.*;
-
 /**
  * Concrete implementation for merging {@link SearchGroup} instances from shard responses.
  */
@@ -49,6 +55,8 @@ public class SearchGroup2ShardResponseProcessor implements ShardResponseProcesso
    */
   @Override
   public void process(ResponseBuilder rb, ShardRequest shardRequest) {
+  	long totalHitCount = 0;
+
     SortSpec ss = rb.getSortSpec();
     Sort groupSort = rb.getGroupingSpec().getGroupSort();
     Grouping2Specification groupSpec = (Grouping2Specification)rb.getGroupingSpec(); 
@@ -107,6 +115,7 @@ public class SearchGroup2ShardResponseProcessor implements ShardResponseProcesso
           continue; // continue if there was an error and we're tolerant.  
         }
         maxElapsedTime = (int) Math.max(maxElapsedTime, srsp.getSolrResponse().getElapsedTime());
+        totalHitCount += (Integer)srsp.getSolrResponse().getResponse().get("totalHitCount");
         @SuppressWarnings("unchecked")
         NamedList<NamedList> firstPhaseResult = (NamedList<NamedList>) srsp.getSolrResponse().getResponse().get("firstPhase");
         final Map<String, SearchGroupsFieldCommandResult> result = serializer.transformToNative(firstPhaseResult, groupSort, sortWithinGroup, srsp.getShard());
@@ -137,6 +146,9 @@ public class SearchGroup2ShardResponseProcessor implements ShardResponseProcesso
           }
         }
       }
+      System.out.println("aaaaaaaaaaaaaaaaaaaaaaaa totalHitCount : "+totalHitCount);
+      Grouping2Specification spec = (Grouping2Specification) rb.getGroupingSpec();
+      spec.setTotalHitCount(totalHitCount);
       rb.firstPhaseElapsedTime = maxElapsedTime;
       for (String groupField : commandSearchGroups.keySet()) {
         List<Collection<SearchGroup<BytesRef>>> topGroups = commandSearchGroups.get(groupField);

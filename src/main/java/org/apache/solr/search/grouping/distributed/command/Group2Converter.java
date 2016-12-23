@@ -253,6 +253,6 @@ public class Group2Converter {
       groupDocs[i] = new Group2Docs<BytesRef, BytesRef>(original.score, original.maxScore, original.totalHits, original.scoreDocs, groupParentValue, groupValue, original.groupSortValues);
     }
     
-    return new TopGroups2<BytesRef, BytesRef>(values.groupSort, values.withinGroupSort, values.totalHitCount, values.totalGroupedHitCount, groupDocs, values.maxScore);
+    return new TopGroups2<BytesRef, BytesRef>(values.groupSort, values.withinGroupSort, values.totalGroupedHitCount, groupDocs, values.maxScore);
   }
 }

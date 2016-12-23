@@ -288,7 +288,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
           CommandHandler.Builder topsGroupsActionBuilder = new CommandHandler.Builder()
               .setQueryCommand(cmd)
               .setNeedDocSet(false) // Order matters here
-              .setIncludeHitCount(false)
+              .setIncludeHitCount(true)
               .setSearcher(searcher);
 
           // use the first field for first level grouping
@@ -302,7 +302,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
         		);
           CommandHandler commandHandler = topsGroupsActionBuilder.build();
           commandHandler.execute();
-          rsp.add("totalHitCount", -1);
+          rsp.add("totalHitCount", commandHandler.getTotalHitCount());
        
           SearchGroups2FirstPassResultTransformer serializer = new SearchGroups2FirstPassResultTransformer(searcher);
           rsp.add("firstPhase", commandHandler.processResult(result, serializer));
@@ -625,7 +625,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
     if (groupSpec.isMain()) {
       endResultTransformer = MAIN_END_RESULT_TRANSFORMER;
     } else if (Grouping.Format.grouped == groupSpec.getResponseFormat()) {
-      endResultTransformer = new Grouped2EndResultTransformer(rb.req.getSearcher());
+      endResultTransformer = new Grouped2EndResultTransformer(groupSpec, rb.req.getSearcher());
     } else if (Grouping.Format.simple == groupSpec.getResponseFormat() && !groupSpec.isMain()) {
       endResultTransformer = SIMPLE_END_RESULT_TRANSFORMER;
     } else {

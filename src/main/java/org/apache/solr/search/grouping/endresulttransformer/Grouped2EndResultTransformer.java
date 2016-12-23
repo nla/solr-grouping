@@ -49,9 +49,11 @@ import org.apache.solr.search.grouping.distributed.command.QueryCommandResult;
 public class Grouped2EndResultTransformer implements EndResultTransformer {
 
   private final SolrIndexSearcher searcher;
+  private final Grouping2Specification spec;
 
-  public Grouped2EndResultTransformer(SolrIndexSearcher searcher) {
+  public Grouped2EndResultTransformer(Grouping2Specification spec, SolrIndexSearcher searcher) {
     this.searcher = searcher;
+    this.spec = spec;
   }
 
   /**
@@ -103,7 +105,8 @@ public class Grouped2EndResultTransformer implements EndResultTransformer {
     		subGroupRec.add("groups", subGroupsList);
     		groupsList.add(groupRec);
     	}
-      groupContainer.add("matches", topGroups.totalHitCount);
+    	long count = spec.getTotalHitCount();
+      groupContainer.add("matches", count);
       groupContainer.add("groups", groupsList);
       grouped.add(field, groupContainer);
     }

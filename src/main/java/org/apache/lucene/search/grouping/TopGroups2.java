@@ -32,19 +32,16 @@ public class TopGroups2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> extends TopGroups
   /** Group results in groupSort order */
   public final Group2Docs<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>[] groups;
   /** Number of documents matching the search */
-  public final long totalHitCount;
 
-  public TopGroups2(SortField[] groupSort, SortField[] withinGroupSort, long totalHitCount, 
+  public TopGroups2(SortField[] groupSort, SortField[] withinGroupSort, 
   		int totalGroupedHitCount, Group2Docs<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE>[] groups, float maxScore) {
   	super(groupSort, withinGroupSort, 0, totalGroupedHitCount, (GroupDocs<GROUP_VALUE_TYPE>[]) groups, maxScore);
     this.groups = groups;
-    this.totalHitCount = totalHitCount;
   }
 
   public TopGroups2(TopGroups2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> oldTopGroups, Integer totalGroupCount) {
   	super(oldTopGroups, totalGroupCount);
     this.groups = oldTopGroups.groups;
-    this.totalHitCount = oldTopGroups.totalHitCount;
   }
 
   /** Merges an array of TopGroups, for example obtained
@@ -66,8 +63,6 @@ public class TopGroups2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> extends TopGroups
    */
   public static <T, T2> TopGroups2<T, T2> merge(TopGroups2<T, T2>[] shardGroups, Sort groupSort, Sort docSort, int docOffset, int docTopN, ScoreMergeMode scoreMergeMode)
     throws IOException {
-
-    //System.out.println("TopGroups.merge");
 
     if (shardGroups.length == 0) {
       return null;
@@ -200,7 +195,6 @@ public class TopGroups2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> extends TopGroups
     if (totalGroupCount != null) {
       TopGroups2<T, T2> result = new TopGroups2<>(groupSort.getSort(),
                               docSort.getSort(),
-                              totalHitCount,
                               totalGroupedHitCount,
                               mergedGroupDocs,
                               totalMaxScore);
@@ -208,7 +202,6 @@ public class TopGroups2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> extends TopGroups
     } else {
       return new TopGroups2<>(groupSort.getSort(),
                               docSort.getSort(),
-                              totalHitCount,
                               totalGroupedHitCount,
                               mergedGroupDocs,
                               totalMaxScore);
