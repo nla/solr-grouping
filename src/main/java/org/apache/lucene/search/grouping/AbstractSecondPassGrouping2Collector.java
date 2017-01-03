@@ -187,7 +187,7 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUB
   	}
     totalHitCount++;
 
-    //System.out.println("FP.collect doc=" + doc);
+//    System.out.println("SP.collect doc=" + doc);
 
     // If orderedGroups != null we already have collected N groups and
     // can short circuit by comparing this document to the bottom group,

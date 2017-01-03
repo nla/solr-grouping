@@ -119,30 +119,6 @@ public class SearchGroup2SecondPhaseShardResponseProcessor implements ShardRespo
         @SuppressWarnings("unchecked")
         NamedList<NamedList> secondPhaseResult = (NamedList<NamedList>) srsp.getSolrResponse().getResponse().get("secondPhase");
         final Map<String, CollectedSearchGroup2<BytesRef, BytesRef>> result = serializer.transformToNative(secondPhaseResult, groupSort, sortWithinGroup, srsp.getShard());
-//        for (String field : result.keySet()) {
-//          final CollectedSearchGroup2<BytesRef> firstPhaseGroup = result.get(field);
-//
-//          final Long groupCount = firstPhaseGroup.groupCount;
-//
-//          final Collection<CollectedSearchGroup2<BytesRef>> searchGroups = firstPhaseGroup.subGroups;
-//          if (searchGroups == null) {
-//            continue;
-//          }
-
-//          commandSearchGroups.get(field).add(searchGroups);
-//          for (SearchGroup<BytesRef> searchGroup : searchGroups) {
-//            Map<SearchGroup<BytesRef>, java.util.Set<String>> map = tempSearchGroupToShards.get(field);
-//            Set<String> shards = map.get(searchGroup);
-//            if (shards == null) {
-//              shards = new HashSet<>();
-//              map.put(searchGroup, shards);
-//            }
-//            shards.add(srsp.getShard());
-//          }
-//        }
-//        hitCountDuringFirstPhase += (Integer) srsp.getSolrResponse().getResponse().get("totalHitCount");
-//      }
-//      rb.totalHitCount = hitCountDuringFirstPhase;
         rb.firstPhaseElapsedTime = maxElapsedTime;
         for (String groupField : result.keySet()) {
         	CollectedSearchGroup2<BytesRef, BytesRef> parent = result.get(groupField);
@@ -161,33 +137,25 @@ public class SearchGroup2SecondPhaseShardResponseProcessor implements ShardRespo
         	groupCount.put(groupField, (count + parent.groupCount));
         }
       }
-      for(Map.Entry<String, List<Collection<SearchGroup<BytesRef>>>> e : all.entrySet()){ 
-      	BytesRef groupKey = new BytesRef(e.getKey());
-      	Collection<SearchGroup<BytesRef>> mergedTopGroups = SearchGroup.merge(e.getValue(), groupSpec.getGroupOffset(), groupSpec.getGroupLimit(), groupSort);
-      	Iterator<SearchGroup<BytesRef>> i = rb.mergedSearchGroups.get(field).iterator();
-      	while(i.hasNext()){
-      		SearchGroup<BytesRef> g = i.next();
-      		if(g.groupValue != null && groupKey.bytesEquals(g.groupValue)){
-      			if(g instanceof CollectedSearchGroup2){
-      				((CollectedSearchGroup2<BytesRef, BytesRef>)g).subGroups = mergedTopGroups;
-      				((CollectedSearchGroup2<BytesRef, BytesRef>)g).groupCount = groupCount.get(e.getKey());
-      			}
-      			else{
-      				CollectedSearchGroup2<BytesRef, BytesRef> newGroup = new CollectedSearchGroup2<>(g);
-      				newGroup.subGroups = mergedTopGroups;
-      				newGroup.groupCount = groupCount.get(e.getKey());
-      				i.remove();
-      				rb.mergedSearchGroups.get(field).add(newGroup);
-      				break;
-      			}
-      		}
+
+      Collection<SearchGroup<BytesRef>> newList = new ArrayList<>();
+      for(SearchGroup<BytesRef> i : rb.mergedSearchGroups.get(field)){
+      	String key = i.groupValue.utf8ToString();
+      	List<Collection<SearchGroup<BytesRef>>> l = all.get(key);
+      	Collection<SearchGroup<BytesRef>> mergedTopGroups = SearchGroup.merge(l, groupSpec.getGroupOffset(), groupSpec.getGroupLimit(), groupSort);
+      	if(i instanceof CollectedSearchGroup2){
+      		((CollectedSearchGroup2<BytesRef, BytesRef>)i).subGroups = mergedTopGroups;
+      		((CollectedSearchGroup2<BytesRef, BytesRef>)i).groupCount = groupCount.get(i.groupValue);
+      		newList.add(i);
+      	}
+      	else{
+      		CollectedSearchGroup2<BytesRef, BytesRef> newGroup = new CollectedSearchGroup2<>(i);
+      		newGroup.subGroups = mergedTopGroups;
+      		newGroup.groupCount = groupCount.get(key);
+      		newList.add(newGroup);
       	}
       }
-
-//	    for (SearchGroup<BytesRef> mergedTopGroup : mergedTopGroups) {
-//	    	rb.searchGroupToShards.get(groupField).put(mergedTopGroup, tempSearchGroupToShards.get(groupField).get(mergedTopGroup));
-//	    }
-	      
+      rb.mergedSearchGroups.replace(field, newList);
    
     } catch (IOException e) {
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);

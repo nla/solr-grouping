@@ -106,6 +106,7 @@ public abstract class AbstractThirdPassGrouping2Collector<GROUP_VALUE_TYPE, SUBG
   public void collect(int doc) throws IOException {
     SearchGroupDocs<SUBGROUP_VALUE_TYPE> group = retrieveGroup(doc);
     if (group != null) {
+//      System.out.println("TP.collect doc=" + doc);
       group.leafCollector.setScorer(scorer);
       group.leafCollector.collect(doc);
     }
