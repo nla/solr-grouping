@@ -91,7 +91,7 @@ public class Grouped2EndResultTransformer implements EndResultTransformer {
         NamedList<Object> subGroupContainer = new SimpleOrderedMap<>();
         NamedList<Object> subGroupRec = new SimpleOrderedMap<>();
         subGroupContainer.add(subField, subGroupRec);
-        groupRec.add("subGrouped", subGroupContainer);
+        groupRec.add("grouped", subGroupContainer);
         subGroupRec.add("matches", group.groupCount);
         List<NamedList> subGroupsList = new ArrayList<>();
     		for(SearchGroup<BytesRef> subGroup : group.subGroups){
@@ -99,7 +99,7 @@ public class Grouped2EndResultTransformer implements EndResultTransformer {
 //      		CollectedSearchGroup2<BytesRef> subGroup = (CollectedSearchGroup2<BytesRef>)sg;
           Object subGroupVal = schemaSubField.getType().toObject(schemaSubField.createField(schemaSubField.getType().indexedToReadable(subGroup.groupValue.utf8ToString()), 1.0f));
           docRec.add("groupValue", subGroupVal);
-          docRec.add("docList", getDocList(rb, topGroups, group.groupValue, subGroup.groupValue, solrDocumentSource));
+          docRec.add("doclist", getDocList(rb, topGroups, group.groupValue, subGroup.groupValue, solrDocumentSource));
           subGroupsList.add(docRec);
     		}
     		subGroupRec.add("groups", subGroupsList);

@@ -146,7 +146,6 @@ public class SearchGroup2ShardResponseProcessor implements ShardResponseProcesso
           }
         }
       }
-      System.out.println("aaaaaaaaaaaaaaaaaaaaaaaa totalHitCount : "+totalHitCount);
       Grouping2Specification spec = (Grouping2Specification) rb.getGroupingSpec();
       spec.setTotalHitCount(totalHitCount);
       rb.firstPhaseElapsedTime = maxElapsedTime;

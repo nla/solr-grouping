@@ -304,11 +304,13 @@ public class Grouping2 {
 
     AbstractAllGroupHeadsCollector<?> allGroupHeadsCollector = null;
     List<Collector> collectors = new ArrayList<>(commands.size());
-    for (Command cmd : commands) {
+    TotalHitCountCollector totalHitCollector = new TotalHitCountCollector(); 
+    for (Command cmd : commands) {// in grouping 2 there should only be one command
       Collector collector = cmd.createFirstPassCollector();
       if (collector != null) {
         collectors.add(collector);
       }
+      collectors.add(totalHitCollector);
       if (getGroupedDocSet && allGroupHeadsCollector == null) {
         collectors.add(allGroupHeadsCollector = cmd.createAllGroupCollector());
       }
@@ -350,6 +352,9 @@ public class Grouping2 {
       qr.setDocSet(setCollector.getDocSet());
     }
 
+    for(Command cmd : commands){// in grouping 2 there should only be one command
+    	cmd.totalHitCount = totalHitCollector.getTotalHits();
+    }
     collectors.clear();
     for (Command cmd : commands) {
       Collector collector = cmd.createSecondPassCollector();
@@ -537,6 +542,7 @@ public class Grouping2 {
     public TotalCount totalCount = TotalCount.ungrouped;
     public SchemaField groupBy;
     public SchemaField parentGroupBy;
+    public int totalHitCount = 0;
 
     TopGroups2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> result;
 
@@ -633,7 +639,7 @@ public class Grouping2 {
       		NamedList<Object> subKey = new SimpleOrderedMap<>();
       		NamedList<Object> subRec = new SimpleOrderedMap<>();
           groupList = new ArrayList();
-          parentRec.add("subGrouped", subGrouped);
+          parentRec.add("grouped", subGrouped);
           subGrouped.add(groupBy.getName(), subKey);
           // have to get the count from the second pass collector
           long count = getCount(group.groupParentValue);
@@ -683,13 +689,13 @@ public class Grouping2 {
       NamedList groupResult = new SimpleOrderedMap();
       grouped.add(key, groupResult);  // grouped={ key={
 
-      int matches = getMatches();
+      long matches = totalHitCount;
       groupResult.add("matches", matches);
       if (totalCount == TotalCount.grouped) {
         Integer totalNrOfGroups = getNumberOfGroups();
         groupResult.add("ngroups", totalNrOfGroups == null ? 0 : totalNrOfGroups);
       }
-      maxMatches = Math.max(maxMatches, matches);
+      maxMatches = Math.max(maxMatches, totalHitCount);
       return groupResult;
     }
 
