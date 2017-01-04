@@ -46,6 +46,7 @@ import org.apache.solr.search.SortSpecParsing;
 import org.apache.solr.search.SyntaxError;
 import org.apache.solr.search.grouping.CommandHandler;
 import org.apache.solr.search.grouping.Grouping2Specification;
+import org.apache.solr.search.grouping.GroupingSpecification;
 import org.apache.solr.search.grouping.distributed.ShardRequestFactory;
 import org.apache.solr.search.grouping.distributed.ShardResponseProcessor;
 import org.apache.solr.search.grouping.distributed.command.QueryCommand.Builder;
@@ -134,7 +135,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
     } catch (IllegalArgumentException e) {
       throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, String.format(Locale.ROOT, "Illegal %s parameter", GroupParams.GROUP_FORMAT));
     }
-    groupingSpec.setResponseFormat(Grouping.Format.grouped);
+    groupingSpec.setResponseFormat(responseFormat);
 
     groupingSpec.setFields(params.getParams(GroupParams.GROUP_FIELD));
     groupingSpec.setQueries(params.getParams(GroupParams.GROUP_QUERY));
@@ -172,6 +173,13 @@ public class QueryComponentGrouping2 extends QueryComponent{
   	f = names[0];
   	if(!searcher.getFieldNames().contains(f)){
       throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Field {"+f+"} not found in schema.");  		
+  	}
+  	
+  	if(groupingSpec.isIncludeGroupCount()){
+      throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Group count not supported.");  		  		
+  	}
+  	if(groupingSpec.getResponseFormat() != Grouping.Format.grouped){
+      throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Group format{" + formatStr + "} not supported.");  		  		
   	}
   }
 	
