@@ -30,8 +30,10 @@ import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.grouping.AbstractSecondPassGrouping2Collector;
 import org.apache.lucene.search.grouping.CollectedSearchGroup2;
 import org.apache.lucene.search.grouping.SearchGroup;
+import org.apache.lucene.search.grouping.function.FunctionNullSecondPassGrouping2Collector;
 import org.apache.lucene.util.ArrayUtil;
 import org.apache.lucene.util.BytesRef;
+import org.apache.lucene.util.mutable.MutableValue;
 import org.apache.solr.schema.SchemaField;
 
 /**
@@ -41,12 +43,10 @@ import org.apache.solr.schema.SchemaField;
  *
  * @lucene.experimental
  */
-public class TermSecondPassGrouping2Collector extends AbstractSecondPassGrouping2Collector<BytesRef, BytesRef> {
+public class TermNullSecondPassGrouping2Collector extends AbstractSecondPassGrouping2Collector<BytesRef, MutableValue> {
 
-  private SortedDocValues index;
   private SortedDocValues indexParent;
 
-  private String groupField;
   private String groupParentField;
   
   
@@ -66,17 +66,16 @@ public class TermSecondPassGrouping2Collector extends AbstractSecondPassGrouping
    *  @param topNGroups How many top groups to keep.
    *  @throws IOException When I/O related errors occur
    */
-  public TermSecondPassGrouping2Collector(SchemaField groupField, SchemaField groupParentField, AbstractSecondPassGrouping2Collector<?, ?> parent,
+  public TermNullSecondPassGrouping2Collector(SchemaField groupParentField, AbstractSecondPassGrouping2Collector<?, ?> parent,
   		Collection<SearchGroup<BytesRef>> topGroups, Sort groupSort, int topNGroups) throws IOException {
     super(groupSort, topNGroups);
-    this.groupField = groupField.getName();
     this.groupParentField = groupParentField.getName();
     this.parent = parent;
     this.topGroupsFirstPass = new ArrayList<>();
     if(topGroups != null){
     	collectors = new HashMap<>();
 	    for(SearchGroup<BytesRef> e : topGroups){
-	    	TermSecondPassGrouping2Collector c = new TermSecondPassGrouping2Collector(groupField, groupParentField, this, null, groupSort, topNGroups);
+	    	FunctionNullSecondPassGrouping2Collector c = new FunctionNullSecondPassGrouping2Collector(groupParentField, this, null, groupSort, topNGroups);
 	    	collectors.put(e.groupValue, c);
 	    	topGroupsFirstPass.add(new CollectedSearchGroup2<>(e));
 	    }
@@ -84,11 +83,11 @@ public class TermSecondPassGrouping2Collector extends AbstractSecondPassGrouping
   }
 
   @Override
-  public BytesRef getDocGroupValue(int doc) {
+  public MutableValue getDocGroupValue(int doc) {
   	if(parent != null){
-  		return (BytesRef)parent.getDocGroupValue(doc);
+  		return (MutableValue)parent.getDocGroupValue(doc);
   	}
-  	return getDocGroupValue(doc, index);
+  	return FunctionNullSecondPassGrouping2Collector.DUMMY_GROUP;
   }
   
 	@Override
@@ -109,29 +108,17 @@ public class TermSecondPassGrouping2Collector extends AbstractSecondPassGrouping
   }
 
   @Override
-  protected BytesRef copyDocGroupValue(BytesRef groupValue, BytesRef reuse) {
-    if (groupValue == null) {
-      return null;
-    } else if (reuse != null) {
-      reuse.bytes = ArrayUtil.grow(reuse.bytes, groupValue.length);
-      reuse.offset = 0;
-      reuse.length = groupValue.length;
-      System.arraycopy(groupValue.bytes, groupValue.offset, reuse.bytes, 0, groupValue.length);
+  protected MutableValue copyDocGroupValue(MutableValue groupValue, MutableValue reuse) {
+    if (reuse != null) {
+      reuse.copy(groupValue);
       return reuse;
-    } else {
-      return BytesRef.deepCopyOf(groupValue);
     }
+    return groupValue.duplicate();
   }
 
   @Override
   protected void doSetNextReader(LeafReaderContext readerContext) throws IOException {
     super.doSetNextReader(readerContext);
-    index = DocValues.getSorted(readerContext.reader(), groupField);
     indexParent = DocValues.getSorted(readerContext.reader(), groupParentField);
   }
-  
-//  @Override
-//  protected BytesRef getValueAsBytesRefx(BytesRef ref){
-//  	return ref;
-//  }
 }

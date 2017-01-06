@@ -96,7 +96,7 @@ public class FunctionTermSecondPassGrouping2Collector extends AbstractSecondPass
       Collection<SearchGroup<MutableValue>> topGroupsMV = Group2Converter.toMutable(groupParentField, topGroups);
     	collectors = new HashMap<>();
 	    for(SearchGroup<MutableValue> e : topGroupsMV){
-	    	TermSecondPassGrouping2Collector c = new TermSecondPassGrouping2Collector(groupField.getName(), groupParentField.getName(), this, null, groupSort, topNGroups);
+	    	TermSecondPassGrouping2Collector c = new TermSecondPassGrouping2Collector(groupField, groupParentField, this, null, groupSort, topNGroups);
 	    	collectors.put(e.groupValue, c);
 	    	topGroupsFirstPass.add(new CollectedSearchGroup2(e));
 	    }

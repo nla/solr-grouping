@@ -1,4 +1,4 @@
-package org.apache.lucene.search.grouping.term;
+package org.apache.lucene.search.grouping.function;
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
@@ -26,13 +26,19 @@ import java.util.Map;
 import org.apache.lucene.index.DocValues;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.SortedDocValues;
+import org.apache.lucene.queries.function.FunctionValues;
+import org.apache.lucene.queries.function.ValueSource;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.grouping.AbstractSecondPassGrouping2Collector;
 import org.apache.lucene.search.grouping.CollectedSearchGroup2;
 import org.apache.lucene.search.grouping.SearchGroup;
-import org.apache.lucene.util.ArrayUtil;
 import org.apache.lucene.util.BytesRef;
+import org.apache.lucene.util.BytesRefBuilder;
+import org.apache.lucene.util.mutable.MutableValue;
+import org.apache.lucene.util.mutable.MutableValueInt;
 import org.apache.solr.schema.SchemaField;
+import org.apache.solr.search.SolrIndexSearcher;
+import org.apache.solr.search.grouping.distributed.command.Group2Converter;
 
 /**
  * Concrete implementation of {@link org.apache.lucene.search.grouping.AbstractFirstPassGroupingCollector} that groups based on
@@ -41,15 +47,20 @@ import org.apache.solr.schema.SchemaField;
  *
  * @lucene.experimental
  */
-public class TermSecondPassGrouping2Collector extends AbstractSecondPassGrouping2Collector<BytesRef, BytesRef> {
+public class FunctionNullSecondPassGrouping2Collector extends AbstractSecondPassGrouping2Collector<MutableValue, MutableValue> {
 
-  private SortedDocValues index;
-  private SortedDocValues indexParent;
+	public static MutableValueInt DUMMY_GROUP = new MutableValueInt();
+	static{
+		DUMMY_GROUP.value = 1;
+	}
+  private SchemaField groupSchemaField;
+  private SchemaField groupParentSchemaField;
 
-  private String groupField;
-  private String groupParentField;
-  
-  
+  private FunctionValues.ValueFiller parentFiller;
+  private MutableValue parentMVal;
+  private ValueSource parentGroupByVS;
+  private Map<?, ?> parentVsContext;
+
   /**
    * Create the first pass collector.
    *
@@ -66,72 +77,70 @@ public class TermSecondPassGrouping2Collector extends AbstractSecondPassGrouping
    *  @param topNGroups How many top groups to keep.
    *  @throws IOException When I/O related errors occur
    */
-  public TermSecondPassGrouping2Collector(SchemaField groupField, SchemaField groupParentField, AbstractSecondPassGrouping2Collector<?, ?> parent,
+  public FunctionNullSecondPassGrouping2Collector(SchemaField groupParentField,
+  		AbstractSecondPassGrouping2Collector parent,
   		Collection<SearchGroup<BytesRef>> topGroups, Sort groupSort, int topNGroups) throws IOException {
     super(groupSort, topNGroups);
-    this.groupField = groupField.getName();
-    this.groupParentField = groupParentField.getName();
     this.parent = parent;
     this.topGroupsFirstPass = new ArrayList<>();
+    if(parent == null){
+    	// this is the parent so setup the document readers.
+    	parentGroupByVS = groupParentField.getType().getValueSource(groupParentField, null);
+    	parentVsContext = new HashMap<>();
+    }
     if(topGroups != null){
+      Collection<SearchGroup<MutableValue>> topGroupsMV = Group2Converter.toMutable(groupParentField, topGroups);
     	collectors = new HashMap<>();
-	    for(SearchGroup<BytesRef> e : topGroups){
-	    	TermSecondPassGrouping2Collector c = new TermSecondPassGrouping2Collector(groupField, groupParentField, this, null, groupSort, topNGroups);
+	    for(SearchGroup<MutableValue> e : topGroupsMV){
+	    	FunctionNullSecondPassGrouping2Collector c = new FunctionNullSecondPassGrouping2Collector(groupParentField, this, null, groupSort, topNGroups);
 	    	collectors.put(e.groupValue, c);
-	    	topGroupsFirstPass.add(new CollectedSearchGroup2<>(e));
+	    	topGroupsFirstPass.add(new CollectedSearchGroup2(e));
 	    }
     }
   }
 
   @Override
-  public BytesRef getDocGroupValue(int doc) {
+  public MutableValue getDocGroupValue(int doc) {
   	if(parent != null){
-  		return (BytesRef)parent.getDocGroupValue(doc);
+  		return (MutableValue)parent.getDocGroupValue(doc);
   	}
-  	return getDocGroupValue(doc, index);
+    return DUMMY_GROUP;
   }
   
 	@Override
-	public BytesRef getDocGroupParentValue(int doc){
+	public MutableValue getDocGroupParentValue(int doc){
   	if(parent != null){
-  		return (BytesRef)parent.getDocGroupParentValue(doc);
+  		return (MutableValue)parent.getDocGroupParentValue(doc);
   	}
-  	return getDocGroupValue(doc, indexParent);
+    parentFiller.fillValue(doc);
+    if(!parentMVal.exists()){
+    	return null;
+    }
+    return parentMVal;
 	}
 
-  protected BytesRef getDocGroupValue(int doc, SortedDocValues index) {
-    final int ord = index.getOrd(doc);
-    if (ord == -1) {
-      return null;
-    } else {
-      return index.lookupOrd(ord);
+  @Override
+  protected MutableValue copyDocGroupValue(MutableValue groupValue, MutableValue reuse) {
+    if (reuse != null) {
+      reuse.copy(groupValue);
+      return reuse;
     }
+    return groupValue.duplicate();
   }
 
-  @Override
-  protected BytesRef copyDocGroupValue(BytesRef groupValue, BytesRef reuse) {
-    if (groupValue == null) {
-      return null;
-    } else if (reuse != null) {
-      reuse.bytes = ArrayUtil.grow(reuse.bytes, groupValue.length);
-      reuse.offset = 0;
-      reuse.length = groupValue.length;
-      System.arraycopy(groupValue.bytes, groupValue.offset, reuse.bytes, 0, groupValue.length);
-      return reuse;
-    } else {
-      return BytesRef.deepCopyOf(groupValue);
-    }
-  }
 
   @Override
   protected void doSetNextReader(LeafReaderContext readerContext) throws IOException {
     super.doSetNextReader(readerContext);
-    index = DocValues.getSorted(readerContext.reader(), groupField);
-    indexParent = DocValues.getSorted(readerContext.reader(), groupParentField);
+    FunctionValues values = parentGroupByVS.getValues(parentVsContext, readerContext);
+    parentFiller = values.getValueFiller();
+    parentMVal = parentFiller.getValue();
   }
   
-//  @Override
-//  protected BytesRef getValueAsBytesRefx(BytesRef ref){
-//  	return ref;
-//  }
+  public SchemaField getGroupParentSchemaFieldx(){
+		return groupParentSchemaField;
+	}
+  public SchemaField getGroupSchemaFieldx(){
+		return groupSchemaField;
+	}
 }

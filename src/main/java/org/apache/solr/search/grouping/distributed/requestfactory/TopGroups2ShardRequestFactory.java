@@ -30,6 +30,7 @@ import org.apache.solr.handler.component.ResponseBuilder;
 import org.apache.solr.handler.component.ShardRequest;
 import org.apache.solr.schema.FieldType;
 import org.apache.solr.schema.IndexSchema;
+import org.apache.solr.schema.TrieIntField;
 import org.apache.solr.search.Grouping;
 import org.apache.solr.search.SolrIndexSearcher;
 import org.apache.solr.search.grouping.Grouping2Specification;
@@ -165,7 +166,13 @@ if(1==1) // for second level we need to check all shards
         		String subGroupValue;
             if (sg.groupValue != null) {
               String rawGroupValue = sg.groupValue.utf8ToString();
-              FieldType fieldType = schema.getField(subField).getType();
+              FieldType fieldType;
+              if(subField == null){
+              	fieldType = new TrieIntField();
+              }
+              else{
+              	fieldType = schema.getField(subField).getType();
+              }
               subGroupValue = fieldType.indexedToReadable(rawGroupValue);
             } else {
               subGroupValue = GROUP_NULL_VALUE;
@@ -184,7 +191,9 @@ if(1==1) // for second level we need to check all shards
     if(!fq.isEmpty()){
     	sreq.params.add("fq", fq);
     }
-    if(!fq2.isEmpty()){
+    Grouping2Specification spec = (Grouping2Specification)rb.getGroupingSpec();
+
+    if(!fq2.isEmpty() && !spec.isSingleGrouped()){
     	sreq.params.add("fq", fq2);
     }
 

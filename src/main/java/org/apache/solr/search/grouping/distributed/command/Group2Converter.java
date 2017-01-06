@@ -48,7 +48,7 @@ import org.archive.util.io.EOFObserver;
  */
 public class Group2Converter {
   
-  public static Collection<SearchGroup<BytesRef>> fromMutable(SchemaField field, SchemaField subField, Collection<SearchGroup<?>> values) {
+  public static Collection<SearchGroup<BytesRef>> fromMutable(FieldType field, FieldType subField, Collection<SearchGroup<?>> values) {
     if (values == null) {
       return null;
     }
@@ -76,7 +76,7 @@ public class Group2Converter {
     return result;
   }
   
-  public static BytesRef convertToBytesRef(SchemaField field, Object val){
+  public static BytesRef convertToBytesRef(FieldType field, Object val){
   	if(val instanceof BytesRef){
   		return (BytesRef)val;
   	}
@@ -91,7 +91,7 @@ public class Group2Converter {
         else{
         	s = mv.toString();
         }
-        field.getType().readableToIndexed(s, binary);
+        field.readableToIndexed(s, binary);
         return binary.get();
       } else {
         return null;
@@ -235,13 +235,11 @@ public class Group2Converter {
     return result;
   }
   
-  public static TopGroups2<BytesRef, BytesRef> fromMutable(SchemaField field, SchemaField subField,
+  public static TopGroups2<BytesRef, BytesRef> fromMutable(FieldType field, FieldType subField,
   		TopGroups2<?, ?> values) {
     if (values == null) {
       return null;
     }
-    
-    FieldType fieldType = field.getType();
     
     @SuppressWarnings("unchecked")
     Group2Docs<BytesRef, BytesRef> groupDocs[] = new Group2Docs[values.groups.length];

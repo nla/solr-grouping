@@ -26,8 +26,10 @@ import org.apache.lucene.index.SortedDocValues;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.grouping.AbstractThirdPassGrouping2Collector;
 import org.apache.lucene.search.grouping.CollectedSearchGroup2;
+import org.apache.lucene.search.grouping.function.FunctionNullSecondPassGrouping2Collector;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.SentinelIntSet;
+import org.apache.lucene.util.mutable.MutableValue;
 import org.apache.solr.schema.SchemaField;
 
 /**
@@ -37,23 +39,21 @@ import org.apache.solr.schema.SchemaField;
  *
  * @lucene.experimental
  */
-public class TermThirdPassGrouping2Collector extends AbstractThirdPassGrouping2Collector<BytesRef, BytesRef> {
+public class TermNullThirdPassGrouping2Collector extends AbstractThirdPassGrouping2Collector<BytesRef, MutableValue> {
 
   private final String groupParentField;
-  private final String groupField;
   private final SentinelIntSet ordSet;
 
-  private SortedDocValues index;
+//  private SortedDocValues index;
   private SortedDocValues indexParent;
 
   @SuppressWarnings({"unchecked", "rawtypes"})
-  public TermThirdPassGrouping2Collector(SchemaField groupField, SchemaField groupParentField, Collection<CollectedSearchGroup2<BytesRef, BytesRef>> groups, 
+  public TermNullThirdPassGrouping2Collector(SchemaField groupParentField, Collection<CollectedSearchGroup2<BytesRef, MutableValue>> groups, 
   		                                   Sort groupSort, Sort withinGroupSort,
                                          int maxDocsPerGroup, boolean getScores, boolean getMaxScores, boolean fillSortFields)
       throws IOException {
     super(groups, groupSort, withinGroupSort, maxDocsPerGroup, getScores, getMaxScores, fillSortFields);
     this.groupParentField = groupParentField.getName();
-    this.groupField = groupField.getName();
     this.ordSet = new SentinelIntSet(groupMap.size(), -2);
     super.groupDocs = (SearchGroupDocs<BytesRef>[][]) new SearchGroupDocs[ordSet.keys.length][ordSet.keys.length];
   }
@@ -61,18 +61,17 @@ public class TermThirdPassGrouping2Collector extends AbstractThirdPassGrouping2C
   @Override
   protected void doSetNextReader(LeafReaderContext readerContext) throws IOException {
     super.doSetNextReader(readerContext);
-    index = DocValues.getSorted(readerContext.reader(), groupField);
+//    index = DocValues.getSorted(readerContext.reader(), groupField);
     indexParent = DocValues.getSorted(readerContext.reader(), groupParentField);
   }
 
   @Override
-  protected SearchGroupDocs<BytesRef> retrieveGroup(int doc) throws IOException {
-  	
-  	Map<BytesRef, SearchGroupDocs<BytesRef>> m = groupMap.get(indexParent.get(doc));
+  protected SearchGroupDocs<MutableValue> retrieveGroup(int doc) throws IOException {
+  	Map<MutableValue, SearchGroupDocs<MutableValue>> m = groupMap.get(indexParent.get(doc));
   	if( m == null){
   		return null;
   	}
-  	return m.get(index.get(doc));
+  	return m.get(FunctionNullSecondPassGrouping2Collector.DUMMY_GROUP); 
   }
 
 }

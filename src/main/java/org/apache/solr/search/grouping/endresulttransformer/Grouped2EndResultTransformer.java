@@ -67,7 +67,14 @@ public class Grouped2EndResultTransformer implements EndResultTransformer {
     NamedList<Object> groupContainer = new SimpleOrderedMap<>();
     SchemaField schemaField = searcher.getSchema().getField(field);
     String subField = ((Grouping2Specification)rb.getGroupingSpec()).getSubField();
-    SchemaField schemaSubField = searcher.getSchema().getField(subField);
+    SchemaField schemaSubField;
+    if(((Grouping2Specification)rb.getGroupingSpec()).isSingleGrouped()){
+    	schemaSubField = schemaField;
+    	subField = field;
+    }
+    else{
+    	schemaSubField = searcher.getSchema().getField(subField);
+    }
     TopGroups2<BytesRef, BytesRef> topGroups = (TopGroups2<BytesRef, BytesRef>)rb.mergedTopGroups.get(field+"."+subField);
     if (topGroups == null) {
     	rb.rsp.add("grouped", grouped);
@@ -88,6 +95,11 @@ public class Grouped2EndResultTransformer implements EndResultTransformer {
         NamedList<Object> groupRec = new SimpleOrderedMap<>();
         Object groupVal = schemaField.getType().toObject(schemaField.createField(schemaField.getType().indexedToReadable(group.groupValue.utf8ToString()), 1.0f)); 
         groupRec.add("groupValue", groupVal);
+        if(spec.isSingleGrouped()){
+          groupRec.add("doclist", getDocList(rb, topGroups, group.groupValue, ((List<SearchGroup<BytesRef>>)group.subGroups).get(0).groupValue, solrDocumentSource));
+      		groupsList.add(groupRec);
+          continue;
+        }
         NamedList<Object> subGroupContainer = new SimpleOrderedMap<>();
         NamedList<Object> subGroupRec = new SimpleOrderedMap<>();
         subGroupContainer.add(subField, subGroupRec);
@@ -207,7 +219,7 @@ public class Grouped2EndResultTransformer implements EndResultTransformer {
     SolrDocumentList docList = new SolrDocumentList();
     Group2Docs<BytesRef, BytesRef> group = null;
     for(Group2Docs<BytesRef, BytesRef> g : topGroups.groups){
-    	if(g.groupValue.bytesEquals(subGroupValue) && g.groupParentValue.bytesEquals(groupValue)){
+    	if((g.groupValue == null || g.groupValue.bytesEquals(subGroupValue)) && g.groupParentValue.bytesEquals(groupValue)){
     		group = g;
     		break;
     	}

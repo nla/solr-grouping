@@ -20,4 +20,7 @@ public class Grouping2Specification extends GroupingSpecification{
   public void setTotalHitCount(long totalHitCount){
 		this.totalHitCount = totalHitCount;
 	}
+  public boolean isSingleGrouped(){
+		return subField == null;
+	}
 }

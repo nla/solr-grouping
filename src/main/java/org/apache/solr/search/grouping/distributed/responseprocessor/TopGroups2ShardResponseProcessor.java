@@ -62,6 +62,9 @@ public class TopGroups2ShardResponseProcessor implements ShardResponseProcessor 
     Sort groupSort = rb.getGroupingSpec().getGroupSort();
     String field = ((Grouping2Specification)rb.getGroupingSpec()).getField();
     String subField = ((Grouping2Specification)rb.getGroupingSpec()).getSubField();
+    if(((Grouping2Specification)rb.getGroupingSpec()).isSingleGrouped()){
+    	subField = field;
+    }
     String[] queries = rb.getGroupingSpec().getQueries();
     Sort sortWithinGroup = rb.getGroupingSpec().getSortWithinGroup();
     if (sortWithinGroup == null) { // TODO prevent it from being null in the first place

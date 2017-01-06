@@ -34,8 +34,10 @@ import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.request.SolrQueryRequest;
 import org.apache.solr.response.ResultContext;
 import org.apache.solr.response.SolrQueryResponse;
+import org.apache.solr.schema.FieldType;
 import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.schema.SchemaField;
+import org.apache.solr.schema.TrieIntField;
 import org.apache.solr.search.DocListAndSet;
 import org.apache.solr.search.DocSlice;
 import org.apache.solr.search.Grouping;
@@ -161,19 +163,24 @@ public class QueryComponentGrouping2 extends QueryComponent{
   	}
     // check for second level grouping
     String[] names = params.getParams(GroupParams.GROUP_FIELD + "."+f);
-  	if(names == null || names.length == 0){
-      throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Second level group must be specified.");
-  	}
+//  	if(names == null || names.length == 0){
+//      throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Second level group must be specified.");
+//  	}
   	if(names != null && names.length > 0){
   		if(names.length > 1){
   			throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Second level group can only be single.");
   		}
-  		groupingSpec.setSubField(names[0]);
   	}
-  	f = names[0];
-  	if(!searcher.getFieldNames().contains(f)){
-      throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Field {"+f+"} not found in schema.");  		
+  	if(names == null || names.length == 0){
+  		f = null;
   	}
+  	else{
+  		f = names[0];
+    	if(!searcher.getFieldNames().contains(f)){
+        throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Field {"+f+"} not found in schema.");  		
+    	}
+  	}
+		groupingSpec.setSubField(f);
   	
   	if(groupingSpec.isIncludeGroupCount()){
       throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Group count not supported.");  		  		
@@ -344,9 +351,12 @@ public class QueryComponentGrouping2 extends QueryComponent{
           String field2 = groupingSpec.getSubField();
           int topNGroups = groupingSpec.getGroupOffset() + groupingSpec.getGroupLimit();
           topNGroups = Math.max(topNGroups, 1);
-
+          SchemaField sc = null;
+          if(!groupingSpec.isSingleGrouped()){
+          	sc = schema.getField(field2);
+          }
           topsGroupsActionBuilder.addCommandField(new SearchGroups2FieldCommand.Builder()
-              .setField(schema.getField(field2))
+              .setField(sc)
               .setParentField(schema.getField(field))
               .setGroupSort(groupingSpec.getGroupSort())
               .setTopNGroups(topNGroups)
@@ -370,40 +380,49 @@ public class QueryComponentGrouping2 extends QueryComponent{
               .setNeedDocSet(false) // Order matters here
               .setIncludeHitCount(false)
               .setSearcher(searcher);
-          SchemaField schemaSubField = schema.getField(groupingSpec.getSubField());
+          SchemaField schemaField = schema.getField(groupingSpec.getField());
+          SchemaField schemaSubField = null;
+          FieldType schemaSubFieldType;
+          if(groupingSpec.isSingleGrouped()){
+          	// as this is single level grouping we can use field to format the dummy value(should be same type)
+          	schemaSubFieldType = new TrieIntField();
+          }
+          else{
+          	schemaSubField = schema.getField(groupingSpec.getSubField());
+          	schemaSubFieldType = schemaSubField.getType();
+          }
           
-          for (String field : groupingSpec.getFields()) {
-            SchemaField schemaField = schema.getField(field);
-            String[] topGroupsParam = params.getParams(GroupParams.GROUP_DISTRIBUTED_TOPGROUPS_PREFIX + field);
-            if (topGroupsParam == null) {
-              topGroupsParam = new String[0];
-            }
+          String field = groupingSpec.getField();
+          String[] topGroupsParam = params.getParams(GroupParams.GROUP_DISTRIBUTED_TOPGROUPS_PREFIX + field);
+          if (topGroupsParam == null) {
+            topGroupsParam = new String[0];
+          }
 
-            Collection<CollectedSearchGroup2<BytesRef, BytesRef>> topGroups = new ArrayList<>(topGroupsParam.length);
-            for (String topGroup : topGroupsParam) {
-              CollectedSearchGroup2<BytesRef, BytesRef> searchGroup = new CollectedSearchGroup2<>();
-              if (!topGroup.equals(TopGroupsShardRequestFactory.GROUP_NULL_VALUE)) {
-                searchGroup.groupValue = new BytesRef(schemaField.getType().readableToIndexed(topGroup));
-                String[] topSubGroupsParam = params.getParams(GroupParams.GROUP_DISTRIBUTED_TOPGROUPS_PREFIX + field
-                		+ "."+topGroup);
-                if (topSubGroupsParam == null) {
-                	topSubGroupsParam = new String[0];
-                }
-                searchGroup.subGroups = new ArrayList<>(topSubGroupsParam.length);
-
-                for (String subGroup : topSubGroupsParam) {
-                  CollectedSearchGroup2<BytesRef, BytesRef> sg = new CollectedSearchGroup2<>();
-                  sg.groupValue = new BytesRef(schemaSubField.getType().readableToIndexed(subGroup));
-                  searchGroup.subGroups.add(sg);
-                }
-                topGroups.add(searchGroup);
+          Collection<CollectedSearchGroup2<BytesRef, BytesRef>> topGroups = new ArrayList<>(topGroupsParam.length);
+          for (String topGroup : topGroupsParam) {
+            CollectedSearchGroup2<BytesRef, BytesRef> searchGroup = new CollectedSearchGroup2<>();
+            if (!topGroup.equals(TopGroupsShardRequestFactory.GROUP_NULL_VALUE)) {
+              searchGroup.groupValue = new BytesRef(schemaField.getType().readableToIndexed(topGroup));
+              String[] topSubGroupsParam = params.getParams(GroupParams.GROUP_DISTRIBUTED_TOPGROUPS_PREFIX + field
+              		+ "."+topGroup);
+              if (topSubGroupsParam == null) {
+              	topSubGroupsParam = new String[0];
               }
+              searchGroup.subGroups = new ArrayList<>(topSubGroupsParam.length);
+
+              for (String subGroup : topSubGroupsParam) {
+                CollectedSearchGroup2<BytesRef, BytesRef> sg = new CollectedSearchGroup2<>();
+                sg.groupValue = new BytesRef(schemaSubFieldType.readableToIndexed(subGroup));
+                searchGroup.subGroups.add(sg);
+              }
+              topGroups.add(searchGroup);
             }
+          }
 
           String field2 = groupingSpec.getSubField();
           topsGroupsActionBuilder.addCommandField(
           		 new TopGroups2FieldCommand.Builder()
-               .setField(schema.getField(field2))
+               .setField(schemaSubField)
                .setParentField(schemaField)
                .setGroupSort(groupingSpec.getGroupSort())
                .setSortWithinGroup(groupingSpec.getSortWithinGroup())
@@ -413,7 +432,6 @@ public class QueryComponentGrouping2 extends QueryComponent{
                .setNeedMaxScore(needScores)
                .build()
                );
-          }
           CommandHandler commandHandler = topsGroupsActionBuilder.build();
           commandHandler.execute();
           TopGroups2ResultTransformer serializer = new TopGroups2ResultTransformer(rb);

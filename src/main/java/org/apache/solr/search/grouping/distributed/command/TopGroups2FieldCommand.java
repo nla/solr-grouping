@@ -29,13 +29,16 @@ import org.apache.lucene.search.grouping.AbstractThirdPassGrouping2Collector;
 import org.apache.lucene.search.grouping.CollectedSearchGroup2;
 import org.apache.lucene.search.grouping.GroupDocs;
 import org.apache.lucene.search.grouping.TopGroups;
+import org.apache.lucene.search.grouping.function.FunctionNullThirdPassGrouping2Collector;
 import org.apache.lucene.search.grouping.function.FunctionTermThirdPassGrouping2Collector;
 import org.apache.lucene.search.grouping.function.FunctionThirdPassGrouping2Collector;
 import org.apache.lucene.search.grouping.term.TermFunctionThirdPassGrouping2Collector;
+import org.apache.lucene.search.grouping.term.TermNullThirdPassGrouping2Collector;
 import org.apache.lucene.search.grouping.term.TermThirdPassGrouping2Collector;
 import org.apache.lucene.util.BytesRef;
 import org.apache.solr.schema.FieldType;
 import org.apache.solr.schema.SchemaField;
+import org.apache.solr.schema.TrieIntField;
 import org.apache.solr.search.grouping.Command;
 
 /**
@@ -95,7 +98,7 @@ public class TopGroups2FieldCommand implements Command<TopGroups<BytesRef>> {
     }
 
     public TopGroups2FieldCommand build() {
-      if (field == null || groupSort == null ||  sortWithinGroup == null || firstPhaseGroups == null ||
+      if (parentField == null || groupSort == null ||  sortWithinGroup == null || firstPhaseGroups == null ||
           maxDocPerGroup == null) {
         throw new IllegalStateException("All required fields must be set");
       }
@@ -140,33 +143,59 @@ public class TopGroups2FieldCommand implements Command<TopGroups<BytesRef>> {
 
     final List<Collector> collectors = new ArrayList<>(1);
     final FieldType parentFieldType = parentField.getType();
-    final FieldType fieldType = field.getType();
-    if (fieldType.getNumericType() != null && parentFieldType.getNumericType() != null) {
-      ValueSource vs = fieldType.getValueSource(field, null);
-      Collection v = 
-      		Group2Converter.toCollectorTypes(parentField, field, firstPhaseGroups);
-      thirdPassCollector = new FunctionThirdPassGrouping2Collector(field, parentField,
-          v, groupSort, sortWithinGroup, maxDocPerGroup, needScores, needMaxScore, true
-      );
+    
+    final FieldType fieldType;
+    SchemaField sf = field;
+    if(field == null){
+    	fieldType = new TrieIntField();
+    	sf = new SchemaField("Dummy", fieldType);
     }
-    else if(fieldType.getNumericType() == null && parentFieldType.getNumericType() != null){
-      Collection v = 
-      		Group2Converter.toCollectorTypes(parentField, field, firstPhaseGroups);
-      thirdPassCollector = new FunctionTermThirdPassGrouping2Collector(field, parentField,
-          v, groupSort, sortWithinGroup, maxDocPerGroup, needScores, needMaxScore, true
-      );    	
+    else{
+    	fieldType = field.getType();
     }
-    else if(fieldType.getNumericType() != null && parentFieldType.getNumericType() == null){
-      Collection v = 
-      		Group2Converter.toCollectorTypes(parentField, field, firstPhaseGroups);
-      thirdPassCollector = new TermFunctionThirdPassGrouping2Collector(field, parentField,
-          v, groupSort, sortWithinGroup, maxDocPerGroup, needScores, needMaxScore, true
-      );    	
+    if(parentFieldType.getNumericType() != null){
+    	if(field == null){
+    		Collection v = 
+    				Group2Converter.toCollectorTypes(parentField, sf, firstPhaseGroups);
+    		thirdPassCollector = new FunctionNullThirdPassGrouping2Collector(parentField,
+    				v, groupSort, sortWithinGroup, maxDocPerGroup, needScores, needMaxScore, true
+    				);    		
+    	}
+    	else if (fieldType.getNumericType() != null) {
+    		Collection v = 
+    				Group2Converter.toCollectorTypes(parentField, sf, firstPhaseGroups);
+    		thirdPassCollector = new FunctionThirdPassGrouping2Collector(field, parentField,
+    				v, groupSort, sortWithinGroup, maxDocPerGroup, needScores, needMaxScore, true
+    				);
+    	}
+    	else{
+    		Collection v = 
+    				Group2Converter.toCollectorTypes(parentField, sf, firstPhaseGroups);
+    		thirdPassCollector = new FunctionTermThirdPassGrouping2Collector(field, parentField,
+    				v, groupSort, sortWithinGroup, maxDocPerGroup, needScores, needMaxScore, true
+    				);    	
+    	}
     }
-    else {
-      thirdPassCollector = new TermThirdPassGrouping2Collector(
-      		field.getName(), parentField.getName(), firstPhaseGroups, groupSort, sortWithinGroup, maxDocPerGroup, needScores, needMaxScore, true
-      );
+    else{
+    	if(field == null){
+	      Collection v = 
+	      		Group2Converter.toCollectorTypes(parentField, sf, firstPhaseGroups);
+	      thirdPassCollector = new TermNullThirdPassGrouping2Collector(
+	      		parentField, v, groupSort, sortWithinGroup, maxDocPerGroup, needScores, needMaxScore, true
+	      );    		
+    	}
+	    else if(fieldType.getNumericType() != null){
+	      Collection v = 
+	      		Group2Converter.toCollectorTypes(parentField, sf, firstPhaseGroups);
+	      thirdPassCollector = new TermFunctionThirdPassGrouping2Collector(field, parentField,
+	          v, groupSort, sortWithinGroup, maxDocPerGroup, needScores, needMaxScore, true
+	      );    	
+	    }
+	    else {
+	      thirdPassCollector = new TermThirdPassGrouping2Collector(
+	      		field, parentField, firstPhaseGroups, groupSort, sortWithinGroup, maxDocPerGroup, needScores, needMaxScore, true
+	      );
+	    }
     }
     collectors.add(thirdPassCollector);
     return collectors;
@@ -179,11 +208,21 @@ public class TopGroups2FieldCommand implements Command<TopGroups<BytesRef>> {
       return new TopGroups<>(groupSort.getSort(), sortWithinGroup.getSort(), 0, 0, new GroupDocs[0], Float.NaN);
     }
 
-    return Group2Converter.fromMutable(parentField, field, thirdPassCollector.getTopGroups(0));
+  	FieldType ft;
+  	if(field != null){
+  		ft = field.getType();
+  	}
+  	else{
+  		ft = new TrieIntField();
+  	}
+    return Group2Converter.fromMutable(parentField.getType(), ft, thirdPassCollector.getTopGroups(0));
   }
 
   @Override
   public String getKey() {
+  	if(field == null){
+  		return parentField.getName();
+  	}
     return field.getName();
   }
   public String getParentKey() {
