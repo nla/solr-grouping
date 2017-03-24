@@ -16,7 +16,13 @@
  */
 package org.apache.solr.search.grouping.distributed.requestfactory;
 
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
 import org.apache.lucene.analysis.reverse.ReverseStringFilter;
+import org.apache.lucene.document.FieldType.NumericType;
 import org.apache.lucene.search.grouping.CollectedSearchGroup2;
 import org.apache.lucene.search.grouping.SearchGroup;
 import org.apache.lucene.util.BytesRef;
@@ -35,13 +41,6 @@ import org.apache.solr.search.Grouping;
 import org.apache.solr.search.SolrIndexSearcher;
 import org.apache.solr.search.grouping.Grouping2Specification;
 import org.apache.solr.search.grouping.distributed.ShardRequestFactory;
-
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * Concrete implementation of {@link ShardRequestFactory} that creates {@link ShardRequest} instances for getting the
@@ -162,27 +161,37 @@ if(1==1) // for second level we need to check all shards
         fq += entry.getKey() + ":" + ClientUtils.escapeQueryChars(groupValue);
         if(phaseThree){
         	CollectedSearchGroup2<BytesRef, BytesRef> collectedSearchGroup = (CollectedSearchGroup2<BytesRef, BytesRef>)searchGroup;
-        	for(SearchGroup<BytesRef> sg : collectedSearchGroup.subGroups){
-        		String subGroupValue;
-            if (sg.groupValue != null) {
-              String rawGroupValue = sg.groupValue.utf8ToString();
-              FieldType fieldType;
-              if(subField == null){
-              	fieldType = new TrieIntField();
-              }
-              else{
-              	fieldType = schema.getField(subField).getType();
-              }
-              subGroupValue = fieldType.indexedToReadable(rawGroupValue);
-            } else {
-              subGroupValue = GROUP_NULL_VALUE;
-            }
+          FieldType fieldType;
+          if(subField == null){
+          	fieldType = new TrieIntField();
+          }
+          else{
+          	fieldType = schema.getField(subField).getType();
+          }
+        	if(collectedSearchGroup.subGroups == null){
+        		String txt = "1";
+        		if(fieldType.getNumericType() == NumericType.LONG){
+        			txt = fieldType.indexedToReadable(""+System.currentTimeMillis());
+        		}
             sreq.params.add(GroupParams.GROUP_DISTRIBUTED_TOPGROUPS_PREFIX + entry.getKey()
-            	+ "." + groupValue, subGroupValue);
-            if(!fq2.isEmpty()){
-            	fq2 += " OR ";
-            }
-            fq2 += subField + ":" + ClientUtils.escapeQueryChars(subGroupValue);
+          	+ "." + groupValue, txt);
+        	}
+        	else{
+	        	for(SearchGroup<BytesRef> sg : collectedSearchGroup.subGroups){
+	        		String subGroupValue;
+	            if (sg.groupValue != null) {
+	              String rawGroupValue = sg.groupValue.utf8ToString();
+	              subGroupValue = fieldType.indexedToReadable(rawGroupValue);
+	            } else {
+	              subGroupValue = GROUP_NULL_VALUE;
+	            }
+	            sreq.params.add(GroupParams.GROUP_DISTRIBUTED_TOPGROUPS_PREFIX + entry.getKey()
+	            	+ "." + groupValue, subGroupValue);
+	            if(!fq2.isEmpty()){
+	            	fq2 += " OR ";
+	            }
+	            fq2 += subField + ":" + ClientUtils.escapeQueryChars(subGroupValue);
+	        	}
         	}
         }
       }

@@ -106,14 +106,16 @@ public class Grouped2EndResultTransformer implements EndResultTransformer {
         groupRec.add("grouped", subGroupContainer);
         subGroupRec.add("matches", group.groupCount);
         List<NamedList> subGroupsList = new ArrayList<>();
-    		for(SearchGroup<BytesRef> subGroup : group.subGroups){
-          NamedList<Object> docRec = new SimpleOrderedMap<>();
-//      		CollectedSearchGroup2<BytesRef> subGroup = (CollectedSearchGroup2<BytesRef>)sg;
-          Object subGroupVal = schemaSubField.getType().toObject(schemaSubField.createField(schemaSubField.getType().indexedToReadable(subGroup.groupValue.utf8ToString()), 1.0f));
-          docRec.add("groupValue", subGroupVal);
-          docRec.add("doclist", getDocList(rb, topGroups, group.groupValue, subGroup.groupValue, solrDocumentSource));
-          subGroupsList.add(docRec);
-    		}
+        if(group.subGroups != null){
+	    		for(SearchGroup<BytesRef> subGroup : group.subGroups){
+	          NamedList<Object> docRec = new SimpleOrderedMap<>();
+//	      		CollectedSearchGroup2<BytesRef> subGroup = (CollectedSearchGroup2<BytesRef>)sg;
+	          Object subGroupVal = schemaSubField.getType().toObject(schemaSubField.createField(schemaSubField.getType().indexedToReadable(subGroup.groupValue.utf8ToString()), 1.0f));
+	          docRec.add("groupValue", subGroupVal);
+	          docRec.add("doclist", getDocList(rb, topGroups, group.groupValue, subGroup.groupValue, solrDocumentSource));
+	          subGroupsList.add(docRec);
+	    		}
+        }
     		subGroupRec.add("groups", subGroupsList);
     		groupsList.add(groupRec);
     	}
