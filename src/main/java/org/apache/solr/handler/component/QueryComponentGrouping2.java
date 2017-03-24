@@ -158,7 +158,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
   		throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "First level group can only be single.");
   	}
     String f = groupingSpec.getField();
-  	if(!searcher.getFieldNames().contains(f)){
+    if(!searcher.getSchema().getFields().containsKey(f)){
       throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Field {"+f+"} not found in schema.");  		
   	}
     // check for second level grouping
@@ -176,7 +176,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
   	}
   	else{
   		f = names[0];
-    	if(!searcher.getFieldNames().contains(f)){
+    	if(!searcher.getSchema().getFields().containsKey(f)){
         throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Field {"+f+"} not found in schema.");  		
     	}
   	}
