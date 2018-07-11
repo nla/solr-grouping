@@ -25,6 +25,7 @@ import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.CursorMarkParams;
+import org.apache.solr.common.params.FacetParams;
 import org.apache.solr.common.params.Group2Params;
 import org.apache.solr.common.params.GroupParams;
 import org.apache.solr.common.params.MoreLikeThisParams;
@@ -48,7 +49,6 @@ import org.apache.solr.search.SortSpecParsing;
 import org.apache.solr.search.SyntaxError;
 import org.apache.solr.search.grouping.CommandHandler;
 import org.apache.solr.search.grouping.Grouping2Specification;
-import org.apache.solr.search.grouping.GroupingSpecification;
 import org.apache.solr.search.grouping.distributed.ShardRequestFactory;
 import org.apache.solr.search.grouping.distributed.ShardResponseProcessor;
 import org.apache.solr.search.grouping.distributed.command.QueryCommand.Builder;
@@ -300,12 +300,19 @@ public class QueryComponentGrouping2 extends QueryComponent{
       try {
         boolean needScores = (cmd.getFlags() & SolrIndexSearcher.GET_SCORES) != 0;
         if (params.getBool(GroupParams.GROUP_DISTRIBUTED_FIRST, false)) {
+        	// in grouping we only get facets on the first pass
+        	// as the second and third pass we have extra filters
+        	boolean docSetNeeded = false;
+          if (rb.req.getParams().getBool(FacetParams.FACET, false)) {
+          	docSetNeeded = true;
+          	rb.setNeedDocSet(true);
+          }
           CommandHandler.Builder topsGroupsActionBuilder = new CommandHandler.Builder()
               .setQueryCommand(cmd)
-              .setNeedDocSet(false) // Order matters here
+           // on first pass we should collect the docSet if needed    
+              .setNeedDocSet(docSetNeeded) 
               .setIncludeHitCount(true)
               .setSearcher(searcher);
-
           // use the first field for first level grouping
           String field = groupingSpec.getField();
           topsGroupsActionBuilder.addCommandField(new SearchGroups2FieldCommand.Builder()
@@ -328,7 +335,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
           // now process the middle phase to get the second level group
           CommandHandler.Builder topsGroupsActionBuilder = new CommandHandler.Builder()
               .setQueryCommand(cmd)
-              .setNeedDocSet(false) // Order matters here
+              .setNeedDocSet(false) 
               .setIncludeHitCount(false)
               .setSearcher(searcher);
           
