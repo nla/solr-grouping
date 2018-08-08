@@ -203,7 +203,7 @@ if(1==1) // for second level we need to check all shards
     Grouping2Specification spec = (Grouping2Specification)rb.getGroupingSpec();
 
     if(!fq2.isEmpty() && !spec.isSingleGrouped()){
-    	sreq.params.add("fq", fq2);
+    	sreq.params.add("fq", "{!cache=false}" + fq2);
     }
 
     if ((rb.getFieldFlags() & SolrIndexSearcher.GET_SCORES) != 0 || rb.getSortSpec().includesScore()) {
