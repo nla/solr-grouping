@@ -21,17 +21,18 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.Map;
 
 import org.apache.lucene.index.DocValues;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.SortedDocValues;
 import org.apache.lucene.search.Sort;
+import org.apache.lucene.search.TopFieldCollector;
+import org.apache.lucene.search.TopScoreDocCollector;
+import org.apache.lucene.search.grouping.AbstractNullSecondPassGrouping2Collector;
 import org.apache.lucene.search.grouping.AbstractSecondPassGrouping2Collector;
 import org.apache.lucene.search.grouping.CollectedSearchGroup2;
 import org.apache.lucene.search.grouping.SearchGroup;
 import org.apache.lucene.search.grouping.function.FunctionNullSecondPassGrouping2Collector;
-import org.apache.lucene.util.ArrayUtil;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.mutable.MutableValue;
 import org.apache.solr.schema.SchemaField;
@@ -43,7 +44,7 @@ import org.apache.solr.schema.SchemaField;
  *
  * @lucene.experimental
  */
-public class TermNullSecondPassGrouping2Collector extends AbstractSecondPassGrouping2Collector<BytesRef, MutableValue> {
+public class TermNullSecondPassGrouping2Collector extends AbstractNullSecondPassGrouping2Collector<BytesRef, MutableValue> {
 
   private SortedDocValues indexParent;
 
@@ -67,17 +68,26 @@ public class TermNullSecondPassGrouping2Collector extends AbstractSecondPassGrou
    *  @throws IOException When I/O related errors occur
    */
   public TermNullSecondPassGrouping2Collector(SchemaField groupParentField, AbstractSecondPassGrouping2Collector<?, ?> parent,
-  		Collection<SearchGroup<BytesRef>> topGroups, Sort groupSort, int topNGroups) throws IOException {
-    super(groupSort, topNGroups);
+  		Collection<SearchGroup<BytesRef>> topGroups, 
+  		Sort groupSort, Sort withinGroupSort, int topNGroups,
+      int maxDocsPerGroup, boolean getScores, boolean getMaxScores, boolean fillSortFields) throws IOException {
+    super(groupSort, topNGroups, maxDocsPerGroup);
     this.groupParentField = groupParentField.getName();
     this.parent = parent;
     this.topGroupsFirstPass = new ArrayList<>();
     if(topGroups != null){
     	collectors = new HashMap<>();
 	    for(SearchGroup<BytesRef> e : topGroups){
-	    	FunctionNullSecondPassGrouping2Collector c = new FunctionNullSecondPassGrouping2Collector(groupParentField, this, null, groupSort, topNGroups);
+	    	FunctionNullSecondPassGrouping2Collector c = new FunctionNullSecondPassGrouping2Collector(groupParentField, this, null, groupSort, withinGroupSort, topNGroups, maxDocsPerGroup, getScores, getMaxScores, fillSortFields);
 	    	collectors.put(e.groupValue, c);
 	    	topGroupsFirstPass.add(new CollectedSearchGroup2<>(e));
+	      if (withinGroupSort.equals(Sort.RELEVANCE)) { // optimize to use TopScoreDocCollector
+	        // Sort by score
+	      	c.collector = TopScoreDocCollector.create(maxDocsPerGroup);
+	      } else {
+	        // Sort by fields
+	      	c.collector = TopFieldCollector.create(withinGroupSort, maxDocsPerGroup, fillSortFields, getScores, getMaxScores);
+	      }
 	    }
     }
   }
@@ -106,7 +116,7 @@ public class TermNullSecondPassGrouping2Collector extends AbstractSecondPassGrou
       return index.lookupOrd(ord);
     }
   }
-
+  
   @Override
   protected MutableValue copyDocGroupValue(MutableValue groupValue, MutableValue reuse) {
     if (reuse != null) {

@@ -22,7 +22,6 @@ import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -85,6 +84,14 @@ public class SearchGroup2SecondPhaseShardResponseProcessor implements ShardRespo
 
       Map<String, List<Collection<SearchGroup<BytesRef>>>> all = new HashMap<>();
       Map<String, Long> groupCount = new HashMap<>();
+      Map<BytesRef, String> groupShard = new HashMap<>();
+      boolean isSingle = false;
+      if(rb.getGroupingSpec() instanceof Grouping2Specification){
+      	Grouping2Specification group2spec = (Grouping2Specification)rb.getGroupingSpec();
+      	if(group2spec.getSubField() == null){
+      		isSingle = true;
+      	}
+      }
       for (ShardResponse srsp : shardRequest.responses) {
         if (shardInfo != null) {
           SimpleOrderedMap<Object> nl = new SimpleOrderedMap<>(4);
@@ -128,6 +135,11 @@ public class SearchGroup2SecondPhaseShardResponseProcessor implements ShardRespo
         		group = new ArrayList<>();
         		all.put(groupField, group);
         	}
+        	if(isSingle){
+	        	for(SearchGroup<BytesRef> br : topGroups){
+	        		groupShard.put(br.groupValue, srsp.getShard());
+	        	}
+        	}
         	group.add(topGroups);
         	// and get the group count
         	Long count = groupCount.get(groupField);
@@ -156,7 +168,6 @@ public class SearchGroup2SecondPhaseShardResponseProcessor implements ShardRespo
       	}
       }
       rb.mergedSearchGroups.replace(field, newList);
-   
     } catch (IOException e) {
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, e);
     }

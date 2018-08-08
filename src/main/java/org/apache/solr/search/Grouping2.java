@@ -30,9 +30,7 @@ import java.util.Set;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.lucene.index.ExitableDirectoryReader;
 import org.apache.lucene.index.IndexableField;
-import org.apache.lucene.queries.function.FunctionQuery;
 import org.apache.lucene.queries.function.ValueSource;
-import org.apache.lucene.queries.function.valuesource.QueryValueSource;
 import org.apache.lucene.search.CachingCollector;
 import org.apache.lucene.search.Collector;
 import org.apache.lucene.search.Filter;
@@ -83,7 +81,6 @@ import org.apache.solr.schema.StrFieldSource;
 import org.apache.solr.schema.TrieIntField;
 import org.apache.solr.search.grouping.collector.FilterCollector;
 import org.apache.solr.search.grouping.distributed.command.Group2Converter;
-import org.archive.format.gzip.zipnum.SummaryBlockIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1435,12 +1432,11 @@ public class Grouping2 {
     protected Collector createSecondPassCollector() throws IOException {
       topGroups = Group2Converter.fromMutable(parentGroupBy.getType(), null, (Collection)firstPass.getTopGroups(offset, false));
 
-      int groupdDocsToCollect = getMax(groupOffset, docsPerGroup, maxDoc);
-      groupdDocsToCollect = Math.max(groupdDocsToCollect, 1);
+      int groupedDocsToCollect = getMax(groupOffset, docsPerGroup, maxDoc);
+      groupedDocsToCollect = Math.max(groupedDocsToCollect, 1);
       Sort withinGroupSort = this.withinGroupSort != null ? this.withinGroupSort : Sort.RELEVANCE;
       secondPass = new FunctionNullSecondPassGrouping2Collector(parentGroupBy, null,
-          topGroups, groupSort, groupdDocsToCollect
-      );
+          topGroups, groupSort, groupSort, actualGroupsToFind, groupedDocsToCollect, true, true, true);
 
 //      if (totalCount == TotalCount.grouped) {
 //        allGroupsCollector = new FunctionAllGroupsCollector(groupBy, context);
@@ -1565,7 +1561,7 @@ public class Grouping2 {
       int groupedDocsToCollect = getMax(groupOffset, docsPerGroup, maxDoc);
       groupedDocsToCollect = Math.max(groupedDocsToCollect, 1);
       secondPass = new TermNullSecondPassGrouping2Collector(
-      		parentGroupBy, null, topGroups, groupSort, groupedDocsToCollect
+      		parentGroupBy, null, topGroups, groupSort, groupSort, actualGroupsToFind, groupedDocsToCollect, true, true, true
       );
 
       if (totalCount == TotalCount.grouped) {

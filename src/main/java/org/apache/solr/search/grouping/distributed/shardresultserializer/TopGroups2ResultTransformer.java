@@ -31,7 +31,6 @@ import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.TopFieldDocs;
 import org.apache.lucene.search.grouping.Group2Docs;
-import org.apache.lucene.search.grouping.GroupDocs;
 import org.apache.lucene.search.grouping.TopGroups;
 import org.apache.lucene.search.grouping.TopGroups2;
 import org.apache.lucene.util.BytesRef;
@@ -41,11 +40,13 @@ import org.apache.solr.handler.component.ShardDoc;
 import org.apache.solr.schema.FieldType;
 import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.schema.SchemaField;
+import org.apache.solr.schema.TrieIntField;
 import org.apache.solr.search.grouping.Command;
+import org.apache.solr.search.grouping.distributed.command.Group2Converter;
 import org.apache.solr.search.grouping.distributed.command.QueryCommand;
 import org.apache.solr.search.grouping.distributed.command.QueryCommandResult;
+import org.apache.solr.search.grouping.distributed.command.SearchGroups2FieldCommand;
 import org.apache.solr.search.grouping.distributed.command.TopGroups2FieldCommand;
-import org.apache.solr.search.grouping.distributed.command.TopGroupsFieldCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,7 +80,16 @@ public class TopGroups2ResultTransformer implements ShardResultTransformer<List<
         SchemaField groupParentField = schema.getField(fieldCommand.getParentKey());
         commandResult = serializeTopGroups(fieldCommand.result(), groupParentField, groupField);
         key = fieldCommand.getParentKey() + "." + command.getKey();
-      } else if (QueryCommand.class.isInstance(command)) {
+      }
+      else if(SearchGroups2FieldCommand.class.isInstance(command)){
+      	SearchGroups2FieldCommand fieldCommand = (SearchGroups2FieldCommand) command;
+        SchemaField groupField = schema.getField(fieldCommand.getKey());
+        SchemaField groupParentField = schema.getField(fieldCommand.getParentKey());
+        TopGroups<BytesRef> tg = Group2Converter.fromMutable(groupParentField.getType(), new TrieIntField(), fieldCommand.getSecondPassGroupingCollector().getTopDocs(0));
+        commandResult = serializeTopGroups(tg, groupParentField, groupField);
+      	key += "."+key;  // expand key to like third pass
+      }
+      else if (QueryCommand.class.isInstance(command)) {
         QueryCommand queryCommand = (QueryCommand) command;
         commandResult = serializeTopDocs(queryCommand.result());
       } else {

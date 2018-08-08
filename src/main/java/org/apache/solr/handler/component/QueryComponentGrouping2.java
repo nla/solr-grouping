@@ -319,6 +319,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
               .setParentField(schema.getField(field))
               .setGroupSort(groupingSpec.getGroupSort())
               .setTopNGroups(cmd.getOffset() + cmd.getLen())
+              .setMaxDocsPerGroup(groupingSpec.getGroupOffset() + groupingSpec.getGroupLimit())
               .setIncludeGroupCount(groupingSpec.isIncludeGroupCount())
               .build()
         		);
@@ -368,6 +369,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
               .setGroupSort(groupingSpec.getGroupSort())
               .setTopNGroups(topNGroups)
               .setIncludeGroupCount(groupingSpec.isIncludeGroupCount())
+              .setMaxDocsPerGroup(groupingSpec.getGroupOffset() + groupingSpec.getGroupLimit())
               .setSearchGroups(topGroups)
               .build()
         		);
@@ -376,6 +378,11 @@ public class QueryComponentGrouping2 extends QueryComponent{
           commandHandler.execute();
           SearchGroups2ResultTransformer serializer = new SearchGroups2ResultTransformer(searcher);
           rsp.add("secondPhase", commandHandler.processResult(result, serializer));
+          if(groupingSpec.isSingleGrouped()){
+          	// create third pass result as no search needed.
+            TopGroups2ResultTransformer serializer2 = new TopGroups2ResultTransformer(rb);
+            rsp.add("thirdPhase", commandHandler.processResult(result, serializer2));
+          }
           rb.setResult(result);
           return;
         	
@@ -594,6 +601,11 @@ public class QueryComponentGrouping2 extends QueryComponent{
     } else if (rb.stage == ResponseBuilder.STAGE_TOP_GROUPS +10) {
       shardRequestFactory = new TopGroups2ShardRequestFactory();
       nextStage = ResponseBuilder.STAGE_EXECUTE_QUERY;
+      if(rb.getGroupingSpec() instanceof Grouping2Specification){
+      	if(((Grouping2Specification)rb.getGroupingSpec()).getSubField() == null){
+          nextStage = ResponseBuilder.STAGE_GET_FIELDS;
+      	}
+      }
     } else if (rb.stage < ResponseBuilder.STAGE_EXECUTE_QUERY) {
       nextStage = ResponseBuilder.STAGE_EXECUTE_QUERY;
     } else if (rb.stage == ResponseBuilder.STAGE_EXECUTE_QUERY) {
@@ -621,6 +633,10 @@ public class QueryComponentGrouping2 extends QueryComponent{
       responseProcessor = new SearchGroup2ShardResponseProcessor();
     } else if ((sreq.purpose & ShardRequest.PURPOSE_GET_TOP_IDS) != 0) {
     	if(sreq.responses.get(0).getSolrResponse().getResponse().get("thirdPhase")!=null){
+    		if(((Grouping2Specification)rb.getGroupingSpec()).isSingleGrouped()){ // single level group so process second and third phase response 
+      		responseProcessor = new SearchGroup2SecondPhaseShardResponseProcessor();
+          responseProcessor.process(rb, sreq);
+    		}
     		responseProcessor = new TopGroups2ShardResponseProcessor();
     	}
     	else{
