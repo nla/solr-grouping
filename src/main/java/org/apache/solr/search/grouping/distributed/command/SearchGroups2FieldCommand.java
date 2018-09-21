@@ -4,46 +4,24 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-import org.apache.lucene.queries.function.ValueSource;
 import org.apache.lucene.search.Collector;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.grouping.AbstractAllGroupsCollector;
 import org.apache.lucene.search.grouping.AbstractFirstPassGrouping2Collector;
 import org.apache.lucene.search.grouping.AbstractSecondPassGrouping2Collector;
 import org.apache.lucene.search.grouping.SearchGroup;
-import org.apache.lucene.search.grouping.function.FunctionAllGroupsCollector;
 import org.apache.lucene.search.grouping.function.FunctionFirstPassGrouping2Collector;
 import org.apache.lucene.search.grouping.function.FunctionNullSecondPassGrouping2Collector;
 import org.apache.lucene.search.grouping.function.FunctionSecondPassGrouping2Collector;
 import org.apache.lucene.search.grouping.function.FunctionTermSecondPassGrouping2Collector;
-import org.apache.lucene.search.grouping.term.TermAllGroupsCollector;
 import org.apache.lucene.search.grouping.term.TermFirstPassGrouping2Collector;
 import org.apache.lucene.search.grouping.term.TermFunctionSecondPassGrouping2Collector;
 import org.apache.lucene.search.grouping.term.TermNullSecondPassGrouping2Collector;
 import org.apache.lucene.search.grouping.term.TermSecondPassGrouping2Collector;
 import org.apache.lucene.util.BytesRef;
 import org.apache.solr.schema.FieldType;
-import org.apache.solr.schema.IntValueFieldType;
 import org.apache.solr.schema.SchemaField;
 import org.apache.solr.schema.TrieIntField;
 import org.apache.solr.search.grouping.Command;
@@ -61,6 +39,7 @@ public class SearchGroups2FieldCommand implements Command<SearchGroupsFieldComma
     private Integer topNGroups;
     private boolean includeGroupCount = false;
     private Collection<SearchGroup<BytesRef>> searchGroups;
+    private Integer maxDocsPerGroup = 1;
 
     public Builder setField(SchemaField field) {
       this.field = field;
@@ -92,21 +71,27 @@ public class SearchGroups2FieldCommand implements Command<SearchGroupsFieldComma
 			return this;
 		}
     
+    public Builder setMaxDocsPerGroup(Integer maxDocsPerGroup){
+			this.maxDocsPerGroup = maxDocsPerGroup;
+			return this;
+		}
+    
     public SearchGroups2FieldCommand build() {
       if (parentField == null || groupSort == null || topNGroups == null) {
         throw new IllegalStateException("All fields must be set");
       }
 
-      return new SearchGroups2FieldCommand(field, parentField, groupSort, topNGroups, includeGroupCount, // firstGroupField, 
+      return new SearchGroups2FieldCommand(field, parentField, groupSort, topNGroups, maxDocsPerGroup, includeGroupCount, // firstGroupField, 
       		searchGroups);
     }
 
   }
 
-  private final SchemaField field;
+  private SchemaField field;
   private final SchemaField parentField;
   private final Sort groupSort;
   private final int topNGroups;
+  private Integer maxDocsPerGroup;
   private final boolean includeGroupCount;
   private Collection<SearchGroup<BytesRef>> searchGroups;
 
@@ -115,11 +100,12 @@ public class SearchGroups2FieldCommand implements Command<SearchGroupsFieldComma
   private AbstractAllGroupsCollector allGroupsCollector;
 
   private SearchGroups2FieldCommand(SchemaField field, SchemaField parentField, Sort groupSort, 
-  		int topNGroups, boolean includeGroupCount, Collection<SearchGroup<BytesRef>> searchGroups) {
+  		int topNGroups, int maxDocsPerGroup, boolean includeGroupCount, Collection<SearchGroup<BytesRef>> searchGroups) {
     this.field = field;
     this.parentField = parentField;
     this.groupSort = groupSort;
     this.topNGroups = topNGroups;
+    this.maxDocsPerGroup = maxDocsPerGroup;
     this.includeGroupCount = includeGroupCount;
     this.searchGroups = searchGroups;
   }
@@ -146,7 +132,7 @@ public class SearchGroups2FieldCommand implements Command<SearchGroupsFieldComma
         if (parentFieldType.getNumericType() != null){
         	if(field == null){
 	      		secondPassGroupingCollector = new FunctionNullSecondPassGrouping2Collector(parentField, 
-	      				null,  searchGroups, groupSort, topNGroups);        		
+	      				null,  searchGroups, groupSort, groupSort, topNGroups, maxDocsPerGroup, true, true, true);        		
         	}
         	else if (fieldType.getNumericType() != null ) {
 	      		secondPassGroupingCollector = new FunctionSecondPassGrouping2Collector(field, parentField, 
@@ -160,7 +146,7 @@ public class SearchGroups2FieldCommand implements Command<SearchGroupsFieldComma
         else{
         	if(field == null){
 	      		secondPassGroupingCollector = new TermNullSecondPassGrouping2Collector(parentField, 
-	      				null,  searchGroups, groupSort, topNGroups);        		
+	      				null,  searchGroups, groupSort, groupSort, topNGroups, maxDocsPerGroup, true, true, true);        		
         	}
 	      	else if(parentFieldType.getNumericType() == null && fieldType.getNumericType() != null){
 	      		secondPassGroupingCollector = new TermFunctionSecondPassGrouping2Collector(field, parentField, 
@@ -237,6 +223,9 @@ public class SearchGroups2FieldCommand implements Command<SearchGroupsFieldComma
   }
   @Override
   public String getKey() {
+  	if(field == null){
+  		return getParentKey();
+  	}
     return field.getName();
   }
   public Collection<SearchGroup<BytesRef>> getSearchGroups(){

@@ -1,5 +1,21 @@
 package org.apache.lucene.search.grouping;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.TreeSet;
+
+import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.search.FieldComparator;
+import org.apache.lucene.search.LeafFieldComparator;
+import org.apache.lucene.search.Scorer;
+import org.apache.lucene.search.SimpleCollector;
+import org.apache.lucene.search.Sort;
+import org.apache.lucene.search.SortField;
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -17,14 +33,6 @@ package org.apache.lucene.search.grouping;
  * limitations under the License.
  */
 
-import org.apache.lucene.index.LeafReaderContext;
-import org.apache.lucene.search.*;
-import org.apache.lucene.search.grouping.term.TermSecondPassGrouping2Collector;
-import org.apache.lucene.util.BytesRef;
-
-import java.io.IOException;
-import java.util.*;
-
 /** FirstPassGrouping2Collector is the first of three passes necessary
  *  to collect grouped hits.  This pass gathers the top N sorted
  *  groups. Concrete subclasses define what a group is and how it
@@ -37,6 +45,7 @@ import java.util.*;
  */
 abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> extends SimpleCollector {
 
+  protected final Sort groupSort;
   private final FieldComparator<?>[] comparators;
   private final LeafFieldComparator[] leafComparators;
   private final int[] reversed;
@@ -54,7 +63,7 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUB
   private int docBase;
   private int spareSlot;
 
-  private long totalHitCount = 0;
+  protected long totalHitCount = 0;
 
   /**
    * Create the first pass collector.
@@ -77,6 +86,7 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUB
     // TODO: allow null groupSort to mean "by relevance",
     // and specialize it?
 
+    this.groupSort = groupSort;
     this.topNGroups = topNGroups;
     this.needsScores = groupSort.needsScores();
     final SortField[] sortFields = groupSort.getSort();
@@ -149,6 +159,8 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUB
       //System.out.println("  group=" + (group.groupValue == null ? "null" : group.groupValue));
       CollectedSearchGroup2<SUBGROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> searchGroup = new CollectedSearchGroup2<>();
       searchGroup.groupValue = group.groupValue;
+      searchGroup.topDoc = group.topDoc;
+      searchGroup.score = group.score;
       if (fillFields) {
         searchGroup.sortValues = new Object[sortFieldCount];
         for(int sortFieldIDX=0;sortFieldIDX<sortFieldCount;sortFieldIDX++) {
@@ -161,11 +173,16 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUB
     return result;
   }
 
-  private Scorer holdScore;
+  // this is for single level grouping ie TermNull.
+  public TopGroups2<GROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> getTopDocs(int withinGroupOffset) {
+  	return null;
+  }
+
+  protected Scorer holdScore;
   @Override
   public void setScorer(Scorer scorer) throws IOException {
+		holdScore = scorer;
   	if(collectors != null){
-  		holdScore = scorer;
   		return;
   	}
     for (LeafFieldComparator comparator : leafComparators) {
@@ -224,7 +241,7 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUB
 
     groupValue = getDocGroupValue(doc);
     if(groupValue == null){
-    	return; // don't wand grouping by null.
+    	return; // don't want grouping by null.
     }
     group = groupMap.get(groupValue);
     
@@ -244,8 +261,8 @@ abstract public class AbstractSecondPassGrouping2Collector<GROUP_VALUE_TYPE, SUB
         CollectedSearchGroup2<SUBGROUP_VALUE_TYPE, SUBGROUP_VALUE_TYPE> sg = new CollectedSearchGroup2<>();
         sg.groupValue = copyDocGroupValue(groupValue, null);
         sg.comparatorSlot = groupMap.size();
-//        sg.subGroupMap = new HashMap<>();
         sg.topDoc = docBase + doc;
+        sg.score = holdScore.score();
         for (LeafFieldComparator fc : leafComparators) {
           fc.copy(sg.comparatorSlot, doc);
         }

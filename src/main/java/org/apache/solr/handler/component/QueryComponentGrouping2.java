@@ -25,6 +25,7 @@ import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.CursorMarkParams;
+import org.apache.solr.common.params.FacetParams;
 import org.apache.solr.common.params.Group2Params;
 import org.apache.solr.common.params.GroupParams;
 import org.apache.solr.common.params.MoreLikeThisParams;
@@ -48,7 +49,6 @@ import org.apache.solr.search.SortSpecParsing;
 import org.apache.solr.search.SyntaxError;
 import org.apache.solr.search.grouping.CommandHandler;
 import org.apache.solr.search.grouping.Grouping2Specification;
-import org.apache.solr.search.grouping.GroupingSpecification;
 import org.apache.solr.search.grouping.distributed.ShardRequestFactory;
 import org.apache.solr.search.grouping.distributed.ShardResponseProcessor;
 import org.apache.solr.search.grouping.distributed.command.QueryCommand.Builder;
@@ -300,18 +300,26 @@ public class QueryComponentGrouping2 extends QueryComponent{
       try {
         boolean needScores = (cmd.getFlags() & SolrIndexSearcher.GET_SCORES) != 0;
         if (params.getBool(GroupParams.GROUP_DISTRIBUTED_FIRST, false)) {
+        	// in grouping we only get facets on the first pass
+        	// as the second and third pass we have extra filters
+        	boolean docSetNeeded = false;
+          if (rb.req.getParams().getBool(FacetParams.FACET, false)) {
+          	docSetNeeded = true;
+          	rb.setNeedDocSet(true);
+          }
           CommandHandler.Builder topsGroupsActionBuilder = new CommandHandler.Builder()
               .setQueryCommand(cmd)
-              .setNeedDocSet(false) // Order matters here
+           // on first pass we should collect the docSet if needed    
+              .setNeedDocSet(docSetNeeded) 
               .setIncludeHitCount(true)
               .setSearcher(searcher);
-
           // use the first field for first level grouping
           String field = groupingSpec.getField();
           topsGroupsActionBuilder.addCommandField(new SearchGroups2FieldCommand.Builder()
               .setParentField(schema.getField(field))
               .setGroupSort(groupingSpec.getGroupSort())
               .setTopNGroups(cmd.getOffset() + cmd.getLen())
+              .setMaxDocsPerGroup(groupingSpec.getGroupOffset() + groupingSpec.getGroupLimit())
               .setIncludeGroupCount(groupingSpec.isIncludeGroupCount())
               .build()
         		);
@@ -328,7 +336,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
           // now process the middle phase to get the second level group
           CommandHandler.Builder topsGroupsActionBuilder = new CommandHandler.Builder()
               .setQueryCommand(cmd)
-              .setNeedDocSet(false) // Order matters here
+              .setNeedDocSet(false) 
               .setIncludeHitCount(false)
               .setSearcher(searcher);
           
@@ -361,6 +369,7 @@ public class QueryComponentGrouping2 extends QueryComponent{
               .setGroupSort(groupingSpec.getGroupSort())
               .setTopNGroups(topNGroups)
               .setIncludeGroupCount(groupingSpec.isIncludeGroupCount())
+              .setMaxDocsPerGroup(groupingSpec.getGroupOffset() + groupingSpec.getGroupLimit())
               .setSearchGroups(topGroups)
               .build()
         		);
@@ -369,6 +378,11 @@ public class QueryComponentGrouping2 extends QueryComponent{
           commandHandler.execute();
           SearchGroups2ResultTransformer serializer = new SearchGroups2ResultTransformer(searcher);
           rsp.add("secondPhase", commandHandler.processResult(result, serializer));
+          if(groupingSpec.isSingleGrouped()){
+          	// create third pass result as no search needed.
+            TopGroups2ResultTransformer serializer2 = new TopGroups2ResultTransformer(rb);
+            rsp.add("thirdPhase", commandHandler.processResult(result, serializer2));
+          }
           rb.setResult(result);
           return;
         	
@@ -587,6 +601,11 @@ public class QueryComponentGrouping2 extends QueryComponent{
     } else if (rb.stage == ResponseBuilder.STAGE_TOP_GROUPS +10) {
       shardRequestFactory = new TopGroups2ShardRequestFactory();
       nextStage = ResponseBuilder.STAGE_EXECUTE_QUERY;
+      if(rb.getGroupingSpec() instanceof Grouping2Specification){
+      	if(((Grouping2Specification)rb.getGroupingSpec()).getSubField() == null){
+          nextStage = ResponseBuilder.STAGE_GET_FIELDS;
+      	}
+      }
     } else if (rb.stage < ResponseBuilder.STAGE_EXECUTE_QUERY) {
       nextStage = ResponseBuilder.STAGE_EXECUTE_QUERY;
     } else if (rb.stage == ResponseBuilder.STAGE_EXECUTE_QUERY) {
@@ -614,6 +633,10 @@ public class QueryComponentGrouping2 extends QueryComponent{
       responseProcessor = new SearchGroup2ShardResponseProcessor();
     } else if ((sreq.purpose & ShardRequest.PURPOSE_GET_TOP_IDS) != 0) {
     	if(sreq.responses.get(0).getSolrResponse().getResponse().get("thirdPhase")!=null){
+    		if(((Grouping2Specification)rb.getGroupingSpec()).isSingleGrouped()){ // single level group so process second and third phase response 
+      		responseProcessor = new SearchGroup2SecondPhaseShardResponseProcessor();
+          responseProcessor.process(rb, sreq);
+    		}
     		responseProcessor = new TopGroups2ShardResponseProcessor();
     	}
     	else{

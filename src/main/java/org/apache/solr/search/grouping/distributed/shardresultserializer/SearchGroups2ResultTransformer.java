@@ -105,12 +105,20 @@ public class SearchGroups2ResultTransformer implements ShardResultTransformer<Li
       		collectedGroup.groupCount = count;
       	}
         Collection<SearchGroup<BytesRef>> searchGroups = new ArrayList<>();
-        final NamedList<List<Comparable>> rawSearchGroups = (NamedList<List<Comparable>>) e.getValue().get(GROUPS);
+        final NamedList<List<Object>> rawSearchGroups = (NamedList<List<Object>>) e.getValue().get(GROUPS);
         if (rawSearchGroups != null) {
-          for (Map.Entry<String, List<Comparable>> rawSearchGroup : rawSearchGroups){
+          for (Map.Entry<String, List<Object>> rawSearchGroup : rawSearchGroups){
 	          CollectedSearchGroup2<BytesRef, BytesRef> searchGroup = new CollectedSearchGroup2<>();
 	          searchGroup.groupValue = rawSearchGroup.getKey() != null ? new BytesRef(rawSearchGroup.getKey()) : null;
-	          searchGroup.sortValues = rawSearchGroup.getValue().toArray(new Comparable[rawSearchGroup.getValue().size()]);
+	      		// convertedSortValues contains id, score + sort values
+	          searchGroup.setTopDoc((int)rawSearchGroup.getValue().get(0));
+	          searchGroup.score = (float)rawSearchGroup.getValue().get(1);
+	          searchGroup.shard = shard;
+	          Comparable[] ca = new Comparable[rawSearchGroup.getValue().size() -2];
+	          for(int i=2;i<rawSearchGroup.getValue().size();i++){
+	          	ca[i-2] = (Comparable)rawSearchGroup.getValue().get(i);
+	          }
+	          searchGroup.sortValues = ca; // 
 	          for (int i = 0; i < searchGroup.sortValues.length; i++) {
 	            SchemaField field = groupSort.getSort()[i].getField() != null ? searcher.getSchema().getFieldOrNull(groupSort.getSort()[i].getField()) : null;
 	            if (field != null) {
@@ -139,7 +147,11 @@ public class SearchGroups2ResultTransformer implements ShardResultTransformer<Li
     	NamedList<Object> groupResult = new NamedList<>();
     	NamedList<Object[]> groupRecord = new NamedList<>();
     	for(SearchGroup<BytesRef> rec : searchGroup.subGroups){
-    		Object[] convertedSortValues = new Object[rec.sortValues.length];
+    		CollectedSearchGroup2<BytesRef, BytesRef> rec2 = (CollectedSearchGroup2<BytesRef, BytesRef>)rec;
+    		// convertedSortValues contains id, score + sort values
+    		Object[] convertedSortValues = new Object[2+rec.sortValues.length];
+    		convertedSortValues[0] = rec2.getTopDoc();
+    		convertedSortValues[1] = rec2.score;
 	      for (int i = 0; i < rec.sortValues.length; i++) {
 	        Object sortValue = rec.sortValues[i];
 	        SchemaField field = groupSort.getSort()[i].getField() != null ? searcher.getSchema().getFieldOrNull(groupSort.getSort()[i].getField()) : null;
@@ -149,7 +161,7 @@ public class SearchGroups2ResultTransformer implements ShardResultTransformer<Li
 	            sortValue = fieldType.marshalSortValue(sortValue);
 	          }
 	        }
-	        convertedSortValues[i] = sortValue;
+	        convertedSortValues[2+i] = sortValue;
 	      }
 	      String groupValue = rec.groupValue != null ? rec.groupValue.utf8ToString() : null;
 	      groupRecord.add(groupValue, convertedSortValues);

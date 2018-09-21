@@ -5,7 +5,7 @@
 
   <groupId>au.gov.nla.solr</groupId>
   <artifactId>groupingsolr</artifactId>
-  <version>5.5.3.NLA.GROUPING.1</version>
+  <version>5.5.3.NLA.GROUPING.2-SNAPSHOT</version>
 
   <packaging>jar</packaging>
 

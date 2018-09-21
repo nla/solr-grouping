@@ -23,9 +23,7 @@ import java.util.List;
 
 import org.apache.lucene.search.grouping.CollectedSearchGroup2;
 import org.apache.lucene.search.grouping.Group2Docs;
-import org.apache.lucene.search.grouping.GroupDocs;
 import org.apache.lucene.search.grouping.SearchGroup;
-import org.apache.lucene.search.grouping.TopGroups;
 import org.apache.lucene.search.grouping.TopGroups2;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.BytesRefBuilder;
@@ -39,7 +37,6 @@ import org.apache.solr.schema.FieldType;
 import org.apache.solr.schema.SchemaField;
 import org.apache.solr.schema.TrieField;
 import org.apache.solr.util.DateFormatUtil;
-import org.archive.util.io.EOFObserver;
 
 /** 
  * this is a transition class: for numeric types we use function-based distributed grouping,
@@ -64,9 +61,10 @@ public class Group2Converter {
       	converted.subGroups = new ArrayList<>();
       	if(org.subGroups != null){
 	      	for(SearchGroup<?> sub : org.subGroups){
-	      		SearchGroup<BytesRef> subConverted = new SearchGroup<>();
-	          subConverted.sortValues = sub.sortValues;
-	      		subConverted.groupValue = convertToBytesRef(subField, sub.groupValue); 
+	      		CollectedSearchGroup2<?, ?> sub2 = (CollectedSearchGroup2<?, ?>)sub;
+	      		CollectedSearchGroup2<BytesRef,BytesRef> subConverted = new CollectedSearchGroup2(sub);
+	          subConverted.sortValues = sub2.sortValues;
+	      		subConverted.groupValue = convertToBytesRef(subField, sub.groupValue);
 	      		converted.subGroups.add(subConverted);
 	      	}
       	}
