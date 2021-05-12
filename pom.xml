@@ -18,7 +18,7 @@
     <compileTarget>1.8</compileTarget>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-    <solr.version>5.5.3</solr.version>
+    <solr.version>8.8.2</solr.version>
   </properties>
 
   <build>
